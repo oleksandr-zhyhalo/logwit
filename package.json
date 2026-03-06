@@ -42,6 +42,7 @@
 		"vite-plugin-devtools-json": "^1.0.0"
 	},
 	"dependencies": {
+		"@iconify/svelte": "^5.2.1",
 		"daisyui": "^5.5.19",
 		"quickwit-js": "^0.3.0",
 		"valibot": "^1.2.0"
