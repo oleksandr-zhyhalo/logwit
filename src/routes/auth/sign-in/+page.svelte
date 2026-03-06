@@ -1,0 +1,42 @@
+<script lang="ts">
+	import { signIn } from '$lib/auth.remote';
+	import { signInSchema } from '$lib/schemas/auth';
+</script>
+
+<div class="card w-full max-w-sm bg-base-100 shadow-sm">
+	<div class="card-body">
+		<h2 class="card-title justify-center text-2xl">Sign In</h2>
+
+		{#each signIn.fields.allIssues() as issue}
+			<div class="alert alert-error text-sm">{issue.message}</div>
+		{/each}
+
+		<form {...signIn.preflight(signInSchema)} class="flex flex-col gap-4">
+			<label class="floating-label">
+				<span>Email</span>
+				<input
+					{...signIn.fields.email.as('email')}
+					class="input input-md w-full"
+					placeholder="Email"
+				/>
+			</label>
+
+			<label class="floating-label">
+				<span>Password</span>
+				<input
+					{...signIn.fields._password.as('password')}
+					class="input input-md w-full"
+					placeholder="Password"
+				/>
+			</label>
+
+			<button class="btn btn-neutral w-full" disabled={!!signIn.pending}>
+				{signIn.pending ? 'Signing in...' : 'Sign In'}
+			</button>
+		</form>
+
+		<p class="text-center text-sm">
+			Don't have an account? <a href="/auth/sign-up" class="link">Sign up</a>
+		</p>
+	</div>
+</div>

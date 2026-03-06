@@ -1,0 +1,14 @@
+# Package Managers
+package-lock.json
+pnpm-lock.yaml
+yarn.lock
+bun.lock
+bun.lockb
+
+# AI
+docs/
+
+
+# Miscellaneous
+/static/
+/drizzle/
