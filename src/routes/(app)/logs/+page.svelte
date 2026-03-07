@@ -8,6 +8,7 @@
 		getIndexFields
 	} from '$lib/api/field-preferences.remote';
 	import { untrack } from 'svelte';
+	import { browser } from '$app/environment';
 	import { getNestedValue, formatFieldValue } from '$lib/utils';
 	import type { Source } from '$lib/types';
 	import TimeRangeBar from './TimeRangeBar.svelte';
@@ -83,7 +84,7 @@
 	async function loadSources() {
 		sources = await getSources();
 		if (sources.length > 0 && selectedSourceId === null) {
-			const saved = localStorage.getItem('selectedSourceId');
+			const saved = browser ? localStorage.getItem('selectedSourceId') : null;
 			const savedId = saved ? Number(saved) : null;
 			const id = savedId && sources.some((s) => s.id === savedId) ? savedId : sources[0].id;
 			selectedSourceId = id;
