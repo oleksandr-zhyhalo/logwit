@@ -10,11 +10,12 @@ export type Source = {
 	updatedAt: Date;
 };
 
-export type UserFieldPreference = {
+export type UserPreference = {
 	id: number;
 	userId: string;
 	sourceId: number | null;
-	fields: string[];
+	displayFields: string[] | null;
+	quickFilterFields: string[] | null;
 	createdAt: Date;
 	updatedAt: Date;
 };

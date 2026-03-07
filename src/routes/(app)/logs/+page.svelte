@@ -2,23 +2,28 @@
 	import { getSources } from '$lib/api/sources.remote';
 	import { searchLogs } from '$lib/api/logs.remote';
 	import {
-		getFieldPreference,
-		saveFieldPreference,
-		deleteFieldPreference,
+		getPreference,
+		saveDisplayFields,
+		deletePreference,
 		getIndexFields
-	} from '$lib/api/field-preferences.remote';
+	} from '$lib/api/preferences.remote';
 	import { untrack } from 'svelte';
 	import { browser } from '$app/environment';
-	import { getNestedValue, formatFieldValue } from '$lib/utils';
+	import { getNestedValue, formatFieldValue, combineQueryWithFilters } from '$lib/utils';
 	import type { Source } from '$lib/types';
 	import TimeRangeBar from './TimeRangeBar.svelte';
 	import LogRow from './LogRow.svelte';
 	import FieldPanel from '$lib/components/FieldPanel.svelte';
+	import QuickFilterPanel from '$lib/components/QuickFilterPanel.svelte';
 
 	let sources = $state<Source[]>([]);
 	let selectedSourceId = $state<number | null>(null);
-	let queryText = $state('');
+	let baseQuery = $state('');
 	let timeRange = $state<'15m' | '1h' | '6h' | '24h' | '7d' | 'all'>('15m');
+	let quickFilterFields = $state<string[]>([]);
+	let activeFilters = $state<Record<string, string[]>>({});
+	let aggregations = $state<Record<string, string[]>>({});
+	let queryText = $derived(combineQueryWithFilters(baseQuery, activeFilters));
 	let logs = $state<Record<string, unknown>[]>([]);
 	let numHits = $state(0);
 	let loading = $state(false);
@@ -99,14 +104,20 @@
 		try {
 			const [fields, pref] = await Promise.all([
 				getIndexFields({ sourceId }),
-				getFieldPreference({ sourceId })
+				getPreference({ sourceId })
 			]);
 			indexFields = fields;
-			activeFields = pref.fields.map((name) => ({ id: name, name }));
+			activeFields = pref.displayFields.map((name) => ({ id: name, name }));
 			hasOverride = pref.isOverride;
+
+			// Load quick filter fields; default to source's levelField
+			quickFilterFields = pref.quickFilterFields.length > 0
+				? pref.quickFilterFields
+				: [selectedSource?.levelField ?? 'level'];
 		} catch {
 			indexFields = [];
 			activeFields = [];
+			quickFilterFields = [];
 		} finally {
 			fieldsLoading = false;
 		}
@@ -115,6 +126,8 @@
 	function handleSourceChange(sourceId: number) {
 		selectedSourceId = sourceId;
 		localStorage.setItem('selectedSourceId', String(sourceId));
+		activeFilters = {};
+		aggregations = {};
 		loadFieldsForSource(sourceId);
 	}
 
@@ -123,14 +136,14 @@
 		clearTimeout(saveTimeout);
 		saveTimeout = setTimeout(() => {
 			if (selectedSourceId) {
-				saveFieldPreference({ sourceId: selectedSourceId, fields });
+				saveDisplayFields({ sourceId: selectedSourceId, fields });
 			}
 		}, 500);
 	}
 
 	async function handleFieldsReset() {
 		if (!selectedSourceId) return;
-		await deleteFieldPreference({ sourceId: selectedSourceId });
+		await deletePreference({ sourceId: selectedSourceId });
 		await loadFieldsForSource(selectedSourceId);
 	}
 
@@ -148,11 +161,19 @@
 				offset: append ? logs.length : 0,
 				limit: BATCH_SIZE,
 				startTimestamp: append ? searchStartTimestamp : undefined,
-				endTimestamp: append ? searchEndTimestamp : undefined
+				endTimestamp: append ? searchEndTimestamp : undefined,
+				quickFilterFields
 			});
 
 			searchStartTimestamp = result.startTimestamp;
 			searchEndTimestamp = result.endTimestamp;
+
+			// Update aggregations only from unfiltered searches so filter
+			// values don't disappear when the user narrows results
+			const hasActiveFilters = Object.keys(activeFilters).length > 0;
+			if (!append && result.aggregations && !hasActiveFilters) {
+				aggregations = result.aggregations;
+			}
 
 			if (append) {
 				logs = [...logs, ...result.hits];
@@ -184,6 +205,13 @@
 		}
 	}
 
+	function handleFilterChange(filters: Record<string, string[]>) {
+		activeFilters = filters;
+		if (hasSearched) {
+			search();
+		}
+	}
+
 	function handleScroll() {
 		if (!scrollElement) return;
 		const { scrollTop, scrollHeight, clientHeight } = scrollElement;
@@ -194,14 +222,22 @@
 </script>
 
 <div class="flex h-full w-full">
-	<FieldPanel
-		availableFields={panelAvailableFields}
-		bind:activeFields
-		onchange={handleFieldsChange}
-		onreset={handleFieldsReset}
-		{hasOverride}
-		loading={fieldsLoading}
-	/>
+	<div class="flex h-full w-56 shrink-0 flex-col border-r border-base-300 bg-base-100">
+		<QuickFilterPanel
+			fields={quickFilterFields}
+			{aggregations}
+			bind:activeFilters
+			onfilter={handleFilterChange}
+		/>
+		<FieldPanel
+			availableFields={panelAvailableFields}
+			bind:activeFields
+			onchange={handleFieldsChange}
+			onreset={handleFieldsReset}
+			{hasOverride}
+			loading={fieldsLoading}
+		/>
+	</div>
 
 	<div class="flex min-w-0 flex-1 flex-col">
 		<!-- Controls bar -->
@@ -221,7 +257,7 @@
 					type="text"
 					class="input-bordered input input-sm flex-1"
 					placeholder="Lucene query (e.g. level:error AND service:api)"
-					bind:value={queryText}
+					bind:value={baseQuery}
 					onkeydown={handleKeydown}
 				/>
 

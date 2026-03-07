@@ -1,15 +1,20 @@
 import * as v from 'valibot';
 
-export const getFieldPreferenceSchema = v.object({
+export const getPreferenceSchema = v.object({
 	sourceId: v.nullable(v.pipe(v.number(), v.integer(), v.minValue(1)))
 });
 
-export const saveFieldPreferenceSchema = v.object({
+export const saveDisplayFieldsSchema = v.object({
 	sourceId: v.nullable(v.pipe(v.number(), v.integer(), v.minValue(1))),
 	fields: v.array(v.string())
 });
 
-export const deleteFieldPreferenceSchema = v.object({
+export const saveQuickFilterFieldsSchema = v.object({
+	sourceId: v.nullable(v.pipe(v.number(), v.integer(), v.minValue(1))),
+	fields: v.array(v.string())
+});
+
+export const deletePreferenceSchema = v.object({
 	sourceId: v.pipe(v.number(), v.integer(), v.minValue(1))
 });
 

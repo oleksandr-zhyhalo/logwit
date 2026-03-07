@@ -1,75 +1,100 @@
 import { command } from '$app/server';
 import { error } from '@sveltejs/kit';
 import { db } from '$lib/server/db';
-import { userFieldPreference, source } from '$lib/server/db/schema';
+import { userPreference, source } from '$lib/server/db/schema';
 import { eq, and, isNull } from 'drizzle-orm';
 import { QuickwitClient } from 'quickwit-js';
 import {
-	getFieldPreferenceSchema,
-	saveFieldPreferenceSchema,
-	deleteFieldPreferenceSchema,
+	getPreferenceSchema,
+	saveDisplayFieldsSchema,
+	saveQuickFilterFieldsSchema,
+	deletePreferenceSchema,
 	getIndexFieldsSchema
-} from '$lib/schemas/field-preference';
+} from '$lib/schemas/preference';
 import { requireUser } from '$lib/middleware/auth';
 import { normalizeQuickwitUrl } from '$lib/utils';
 
-export const getFieldPreference = command(getFieldPreferenceSchema, async (data) => {
+export const getPreference = command(getPreferenceSchema, async (data) => {
 	const user = requireUser();
 
 	// Try per-source first
 	if (data.sourceId !== null) {
 		const [pref] = await db
 			.select()
-			.from(userFieldPreference)
+			.from(userPreference)
 			.where(
 				and(
-					eq(userFieldPreference.userId, user.id),
-					eq(userFieldPreference.sourceId, data.sourceId)
+					eq(userPreference.userId, user.id),
+					eq(userPreference.sourceId, data.sourceId)
 				)
 			);
-		if (pref) return { fields: pref.fields as string[], isOverride: true };
+		if (pref) {
+			return {
+				displayFields: (pref.displayFields as string[]) ?? [],
+				quickFilterFields: (pref.quickFilterFields as string[]) ?? [],
+				isOverride: true
+			};
+		}
 	}
 
 	// Fallback to global default
 	const [globalPref] = await db
 		.select()
-		.from(userFieldPreference)
+		.from(userPreference)
 		.where(
 			and(
-				eq(userFieldPreference.userId, user.id),
-				isNull(userFieldPreference.sourceId)
+				eq(userPreference.userId, user.id),
+				isNull(userPreference.sourceId)
 			)
 		);
 
-	return { fields: (globalPref?.fields as string[]) ?? [], isOverride: false };
+	return {
+		displayFields: (globalPref?.displayFields as string[]) ?? [],
+		quickFilterFields: (globalPref?.quickFilterFields as string[]) ?? [],
+		isOverride: false
+	};
 });
 
-export const saveFieldPreference = command(saveFieldPreferenceSchema, async (data) => {
+export const saveDisplayFields = command(saveDisplayFieldsSchema, async (data) => {
 	const user = requireUser();
 
-	const [result] = await db
-		.insert(userFieldPreference)
+	await db
+		.insert(userPreference)
 		.values({
 			userId: user.id,
 			sourceId: data.sourceId,
-			fields: data.fields
+			displayFields: data.fields
 		})
 		.onConflictDoUpdate({
-			target: [userFieldPreference.userId, userFieldPreference.sourceId],
-			set: { fields: data.fields, updatedAt: new Date() }
-		})
-		.returning();
-	return result;
+			target: [userPreference.userId, userPreference.sourceId],
+			set: { displayFields: data.fields, updatedAt: new Date() }
+		});
 });
 
-export const deleteFieldPreference = command(deleteFieldPreferenceSchema, async (data) => {
+export const saveQuickFilterFields = command(saveQuickFilterFieldsSchema, async (data) => {
+	const user = requireUser();
+
+	await db
+		.insert(userPreference)
+		.values({
+			userId: user.id,
+			sourceId: data.sourceId,
+			quickFilterFields: data.fields
+		})
+		.onConflictDoUpdate({
+			target: [userPreference.userId, userPreference.sourceId],
+			set: { quickFilterFields: data.fields, updatedAt: new Date() }
+		});
+});
+
+export const deletePreference = command(deletePreferenceSchema, async (data) => {
 	const user = requireUser();
 	await db
-		.delete(userFieldPreference)
+		.delete(userPreference)
 		.where(
 			and(
-				eq(userFieldPreference.userId, user.id),
-				eq(userFieldPreference.sourceId, data.sourceId)
+				eq(userPreference.userId, user.id),
+				eq(userPreference.sourceId, data.sourceId)
 			)
 		);
 });

@@ -13,15 +13,16 @@ export const source = pgTable('source', {
 	updatedAt: timestamp('updated_at').defaultNow().notNull()
 });
 
-export const userFieldPreference = pgTable('user_field_preference', {
+export const userPreference = pgTable('user_preference', {
 	id: serial('id').primaryKey(),
 	userId: text('user_id').notNull().references(() => user.id, { onDelete: 'cascade' }),
 	sourceId: integer('source_id').references(() => source.id, { onDelete: 'cascade' }),
-	fields: jsonb('fields').notNull().$type<string[]>(),
+	displayFields: jsonb('display_fields').$type<string[]>(),
+	quickFilterFields: jsonb('quick_filter_fields').$type<string[]>(),
 	createdAt: timestamp('created_at').defaultNow().notNull(),
 	updatedAt: timestamp('updated_at').defaultNow().notNull()
 }, (table) => [
-	unique('user_source_unique').on(table.userId, table.sourceId)
+	unique('user_preference_unique').on(table.userId, table.sourceId)
 ]);
 
 export * from './auth.schema';

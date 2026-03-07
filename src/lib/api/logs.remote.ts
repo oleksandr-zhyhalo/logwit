@@ -4,7 +4,7 @@ import { db } from '$lib/server/db';
 import { source } from '$lib/server/db/schema';
 import { eq } from 'drizzle-orm';
 import { searchLogsSchema } from '$lib/schemas/logs';
-import { QuickwitClient } from 'quickwit-js';
+import { QuickwitClient, AggregationBuilder } from 'quickwit-js';
 import { requireUser } from '$lib/middleware/auth';
 import { normalizeQuickwitUrl } from '$lib/utils';
 
@@ -48,12 +48,31 @@ export const searchLogs = command(searchLogsSchema, async (data) => {
 		query.timeRange(startTs, endTs);
 	}
 
+	// Add aggregations for quick filter fields
+	if (data.quickFilterFields?.length) {
+		for (const field of data.quickFilterFields) {
+			query.agg(field, AggregationBuilder.terms(field, { size: 20 }));
+		}
+	}
+
 	const result = await index.search(query);
+
+	// Extract aggregation buckets into a simple map
+	const aggregations: Record<string, string[]> = {};
+	if (result.aggregations) {
+		for (const [field, agg] of Object.entries(result.aggregations)) {
+			const bucketAgg = agg as { buckets?: { key: string }[] };
+			if (bucketAgg.buckets) {
+				aggregations[field] = bucketAgg.buckets.map((b) => String(b.key));
+			}
+		}
+	}
 
 	return {
 		hits: result.hits,
 		numHits: result.num_hits,
 		startTimestamp: startTs,
-		endTimestamp: endTs
+		endTimestamp: endTs,
+		aggregations
 	};
 });
