@@ -9,3 +9,12 @@ export type Source = {
 	createdAt: Date;
 	updatedAt: Date;
 };
+
+export type UserFieldPreference = {
+	id: number;
+	userId: string;
+	sourceId: number | null;
+	fields: string[];
+	createdAt: Date;
+	updatedAt: Date;
+};

@@ -53,10 +53,8 @@
 				<h1 class="text-sm font-medium">{pageTitle}</h1>
 			</div>
 		</div>
-		<div class="flex-1 overflow-y-auto">
-			<div class="flex min-h-full justify-center">
-				{@render children()}
-			</div>
+		<div class="min-h-0 flex-1">
+			{@render children()}
 		</div>
 	</div>
 </div>

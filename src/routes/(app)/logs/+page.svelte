@@ -1,9 +1,11 @@
 <script lang="ts">
 	import { getSources } from '$lib/sources.remote';
 	import { searchLogs } from '$lib/logs.remote';
+	import { getFieldPreference, saveFieldPreference, deleteFieldPreference, getIndexFields } from '$lib/field-preferences.remote';
 	import type { Source } from '$lib/types';
 	import TimeRangeBar from './TimeRangeBar.svelte';
 	import LogRow from './LogRow.svelte';
+	import FieldPanel from './FieldPanel.svelte';
 
 	let sources = $state<Source[]>([]);
 	let selectedSourceId = $state<number | null>(null);
@@ -17,16 +19,73 @@
 	let wrapMode = $state<'none' | 'wrap' | 'pretty'>('none');
 	let selectedSource = $derived(sources.find((s) => s.id === selectedSourceId));
 
+	let indexFields = $state<{ name: string; type: string }[]>([]);
+	let activeFields = $state<{ id: string; name: string }[]>([]);
+	let hasOverride = $state(false);
+	let fieldsLoading = $state(false);
+
+	let excludedFields = $derived(new Set([
+		selectedSource?.levelField ?? 'level',
+		selectedSource?.timestampField ?? 'timestamp',
+		selectedSource?.messageField ?? 'message'
+	]));
+
+	let panelAvailableFields = $derived(
+		indexFields.filter((f) => !excludedFields.has(f.name))
+	);
+
+	let extraFieldNames = $derived(activeFields.map((f) => f.name));
+
 	const BATCH_SIZE = 50;
 
 	async function loadSources() {
 		sources = await getSources();
 		if (sources.length > 0 && selectedSourceId === null) {
 			selectedSourceId = sources[0].id;
+			loadFieldsForSource(sources[0].id);
 		}
 	}
 
 	loadSources();
+
+	async function loadFieldsForSource(sourceId: number) {
+		fieldsLoading = true;
+		try {
+			const [fields, pref] = await Promise.all([
+				getIndexFields({ sourceId }),
+				getFieldPreference({ sourceId })
+			]);
+			indexFields = fields;
+			activeFields = pref.fields.map((name) => ({ id: name, name }));
+			hasOverride = pref.isOverride;
+		} catch {
+			indexFields = [];
+			activeFields = [];
+		} finally {
+			fieldsLoading = false;
+		}
+	}
+
+	function handleSourceChange(sourceId: number) {
+		selectedSourceId = sourceId;
+		loadFieldsForSource(sourceId);
+	}
+
+	let saveTimeout: ReturnType<typeof setTimeout>;
+	function handleFieldsChange(fields: string[]) {
+		clearTimeout(saveTimeout);
+		saveTimeout = setTimeout(() => {
+			if (selectedSourceId) {
+				saveFieldPreference({ sourceId: selectedSourceId, fields });
+			}
+		}, 500);
+	}
+
+	async function handleFieldsReset() {
+		if (!selectedSourceId) return;
+		await deleteFieldPreference({ sourceId: selectedSourceId });
+		await loadFieldsForSource(selectedSourceId);
+	}
 
 	async function search(append = false) {
 		if (!selectedSourceId) return;
@@ -85,56 +144,69 @@
 	let canLoadMore = $derived(logs.length < numHits);
 </script>
 
-<div class="flex h-full w-full flex-col">
-	<!-- Controls bar -->
-	<div class="border-b border-base-300 bg-base-100 px-4 py-3">
-		<div class="flex w-full items-center gap-2">
-			<select class="select select-bordered select-sm w-48" bind:value={selectedSourceId}>
-				{#each sources as src (src.id)}
-					<option value={src.id}>{src.name}</option>
-				{/each}
-			</select>
+<div class="flex h-full w-full">
+	<FieldPanel
+		availableFields={panelAvailableFields}
+		bind:activeFields
+		onchange={handleFieldsChange}
+		onreset={handleFieldsReset}
+		{hasOverride}
+		loading={fieldsLoading}
+	/>
 
-			<input
-				type="text"
-				class="input input-bordered input-sm flex-1"
-				placeholder="Lucene query (e.g. level:error AND service:api)"
-				bind:value={queryText}
-				onkeydown={handleKeydown}
-			/>
-
-			<button
-				class="btn btn-primary btn-sm"
-				onclick={() => search()}
-				disabled={loading || !selectedSourceId}
-			>
-				{loading && !logs.length ? 'Searching...' : 'Search'}
-			</button>
-		</div>
-
-		<div class="mt-2 flex w-full items-center justify-between">
-			<TimeRangeBar value={timeRange} onchange={handleTimeRangeChange} />
-			<div class="flex items-center gap-3">
-				<div class="flex gap-1">
-					{#each [['none', 'No wrap'], ['wrap', 'Wrap'], ['pretty', 'Pretty']] as [mode, label] (mode)}
-						<button
-							class="btn btn-xs {wrapMode === mode ? 'btn-primary' : 'btn-ghost'}"
-							onclick={() => (wrapMode = mode as typeof wrapMode)}
-						>
-							{label}
-						</button>
+	<div class="flex min-w-0 flex-1 flex-col">
+		<!-- Controls bar -->
+		<div class="border-b border-base-300 bg-base-100 px-4 py-3">
+			<div class="flex w-full items-center gap-2">
+				<select
+					class="select select-bordered select-sm w-48"
+					value={selectedSourceId}
+					onchange={(e) => handleSourceChange(Number(e.currentTarget.value))}
+				>
+					{#each sources as src (src.id)}
+						<option value={src.id}>{src.name}</option>
 					{/each}
+				</select>
+
+				<input
+					type="text"
+					class="input input-bordered input-sm flex-1"
+					placeholder="Lucene query (e.g. level:error AND service:api)"
+					bind:value={queryText}
+					onkeydown={handleKeydown}
+				/>
+
+				<button
+					class="btn btn-primary btn-sm"
+					onclick={() => search()}
+					disabled={loading || !selectedSourceId}
+				>
+					{loading && !logs.length ? 'Searching...' : 'Search'}
+				</button>
+			</div>
+
+			<div class="mt-2 flex w-full items-center justify-between">
+				<TimeRangeBar value={timeRange} onchange={handleTimeRangeChange} />
+				<div class="flex items-center gap-3">
+					<div class="flex gap-1">
+						{#each [['none', 'No wrap'], ['wrap', 'Wrap'], ['pretty', 'Pretty']] as [mode, label] (mode)}
+							<button
+								class="btn btn-xs {wrapMode === mode ? 'btn-primary' : 'btn-ghost'}"
+								onclick={() => (wrapMode = mode as typeof wrapMode)}
+							>
+								{label}
+							</button>
+						{/each}
+					</div>
+					{#if hasSearched}
+						<span class="text-xs text-base-content/50">{numHits.toLocaleString()} hits</span>
+					{/if}
 				</div>
-				{#if hasSearched}
-					<span class="text-xs text-base-content/50">{numHits.toLocaleString()} hits</span>
-				{/if}
 			</div>
 		</div>
-	</div>
 
-	<!-- Log stream -->
-	<div class="flex-1 overflow-y-auto bg-base-200/30 {wrapMode !== 'none' ? '' : 'overflow-x-auto'}" onscroll={handleScroll}>
-		<div class="{wrapMode !== 'none' ? '' : 'w-fit min-w-full'}">
+		<!-- Log stream -->
+		<div class="min-h-0 flex-1 overflow-auto bg-base-200/30" onscroll={handleScroll}>
 			{#if errorMessage}
 				<div class="p-4">
 					<div class="alert alert-error text-sm">{errorMessage}</div>
@@ -148,20 +220,23 @@
 					<p class="text-sm text-base-content/40">No logs found</p>
 				</div>
 			{:else}
-				{#each logs as hit, i (i)}
-					<LogRow
-					{hit}
-					{wrapMode}
-					levelField={selectedSource?.levelField ?? 'level'}
-					timestampField={selectedSource?.timestampField ?? 'timestamp'}
-					messageField={selectedSource?.messageField ?? 'message'}
-				/>
-				{/each}
-				{#if loading}
-					<div class="flex justify-center py-4">
-						<span class="loading loading-spinner loading-sm"></span>
-					</div>
-				{/if}
+				<div class="w-fit min-w-full">
+					{#each logs as hit, i (i)}
+						<LogRow
+							{hit}
+							{wrapMode}
+							levelField={selectedSource?.levelField ?? 'level'}
+							timestampField={selectedSource?.timestampField ?? 'timestamp'}
+							messageField={selectedSource?.messageField ?? 'message'}
+							extraFields={extraFieldNames}
+						/>
+					{/each}
+					{#if loading}
+						<div class="flex justify-center py-4">
+							<span class="loading loading-spinner loading-sm"></span>
+						</div>
+					{/if}
+				</div>
 			{/if}
 		</div>
 	</div>

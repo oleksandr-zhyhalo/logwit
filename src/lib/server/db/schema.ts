@@ -1,4 +1,5 @@
-import { pgTable, serial, integer, text, timestamp } from 'drizzle-orm/pg-core';
+import { pgTable, serial, integer, text, timestamp, jsonb, unique } from 'drizzle-orm/pg-core';
+import { user } from './auth.schema';
 
 export const task = pgTable('task', {
 	id: serial('id').primaryKey(),
@@ -17,5 +18,16 @@ export const source = pgTable('source', {
 	createdAt: timestamp('created_at').defaultNow().notNull(),
 	updatedAt: timestamp('updated_at').defaultNow().notNull()
 });
+
+export const userFieldPreference = pgTable('user_field_preference', {
+	id: serial('id').primaryKey(),
+	userId: text('user_id').notNull().references(() => user.id, { onDelete: 'cascade' }),
+	sourceId: integer('source_id').references(() => source.id, { onDelete: 'cascade' }),
+	fields: jsonb('fields').notNull().$type<string[]>(),
+	createdAt: timestamp('created_at').defaultNow().notNull(),
+	updatedAt: timestamp('updated_at').defaultNow().notNull()
+}, (table) => [
+	unique('user_source_unique').on(table.userId, table.sourceId)
+]);
 
 export * from './auth.schema';
