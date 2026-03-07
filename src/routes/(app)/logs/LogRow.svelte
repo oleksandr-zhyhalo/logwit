@@ -5,7 +5,8 @@
 		levelField = 'level',
 		timestampField = 'timestamp',
 		messageField = 'message',
-		extraFields = []
+		extraFields = [],
+		columnWidths = {}
 	}: {
 		hit: Record<string, unknown>;
 		wrapMode: 'none' | 'wrap' | 'pretty';
@@ -13,6 +14,7 @@
 		timestampField?: string;
 		messageField?: string;
 		extraFields?: string[];
+		columnWidths?: Record<string, number>;
 	} = $props();
 
 	function extractSeverity(doc: Record<string, unknown>): string {
@@ -89,7 +91,10 @@
 	<div class="w-1 shrink-0 rounded-full {severityColor(severity)}"></div>
 	<span class="shrink-0 py-px pl-3 text-base-content/40">{extractTimestamp(hit)}</span>
 	{#each extraFields as field (field)}
-		<span class="shrink-0 truncate py-px pl-2">{hit[field] ?? ''}</span>
+		<span
+			class="shrink-0 truncate py-px pl-2"
+			style="width: {columnWidths[field] ?? 'auto'}ch"
+		>{hit[field] ?? ''}</span>
 	{/each}
 	<span
 		class="py-px pl-2 text-base-content/80 {wrapMode !== 'none'

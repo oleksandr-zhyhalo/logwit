@@ -43,6 +43,22 @@
 
 	let extraFieldNames = $derived(activeFields.map((f) => f.name));
 
+	const MAX_COLUMN_CH = 60;
+	let columnWidths = $derived.by(() => {
+		const widths: Record<string, number> = {};
+		for (const field of extraFieldNames) {
+			let max = field.length;
+			for (const log of logs) {
+				const val = log[field];
+				if (val !== undefined && val !== null) {
+					max = Math.max(max, String(val).length);
+				}
+			}
+			widths[field] = Math.min(max + 2, MAX_COLUMN_CH);
+		}
+		return widths;
+	});
+
 	let scrollElement = $state<HTMLDivElement | null>(null);
 
 	const virtualizer = createVirtualizer({
@@ -61,7 +77,7 @@
 			$virtualizer.setOptions({
 				count,
 				getScrollElement: () => el,
-				estimateSize: () => (mode === 'none' ? 28 : 80)
+				estimateSize: () => 28
 			});
 			$virtualizer.measure();
 		});
@@ -269,6 +285,7 @@
 								timestampField={selectedSource?.timestampField ?? 'timestamp'}
 								messageField={selectedSource?.messageField ?? 'message'}
 								extraFields={extraFieldNames}
+								{columnWidths}
 							/>
 						</div>
 					{/each}
