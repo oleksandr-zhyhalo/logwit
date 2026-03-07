@@ -43,6 +43,7 @@
 	},
 	"dependencies": {
 		"@iconify/svelte": "^5.2.1",
+		"@tanstack/svelte-virtual": "^3.13.21",
 		"daisyui": "^5.5.19",
 		"quickwit-js": "^0.3.0",
 		"svelte-dnd-action": "^0.9.69",

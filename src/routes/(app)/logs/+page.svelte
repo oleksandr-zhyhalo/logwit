@@ -1,7 +1,14 @@
 <script lang="ts">
 	import { getSources } from '$lib/sources.remote';
 	import { searchLogs } from '$lib/logs.remote';
-	import { getFieldPreference, saveFieldPreference, deleteFieldPreference, getIndexFields } from '$lib/field-preferences.remote';
+	import {
+		getFieldPreference,
+		saveFieldPreference,
+		deleteFieldPreference,
+		getIndexFields
+	} from '$lib/field-preferences.remote';
+	import { createVirtualizer } from '@tanstack/svelte-virtual';
+	import { untrack } from 'svelte';
 	import type { Source } from '$lib/types';
 	import TimeRangeBar from './TimeRangeBar.svelte';
 	import LogRow from './LogRow.svelte';
@@ -24,17 +31,40 @@
 	let hasOverride = $state(false);
 	let fieldsLoading = $state(false);
 
-	let excludedFields = $derived(new Set([
-		selectedSource?.levelField ?? 'level',
-		selectedSource?.timestampField ?? 'timestamp',
-		selectedSource?.messageField ?? 'message'
-	]));
-
-	let panelAvailableFields = $derived(
-		indexFields.filter((f) => !excludedFields.has(f.name))
+	let excludedFields = $derived(
+		new Set([
+			selectedSource?.levelField ?? 'level',
+			selectedSource?.timestampField ?? 'timestamp',
+			selectedSource?.messageField ?? 'message'
+		])
 	);
 
+	let panelAvailableFields = $derived(indexFields.filter((f) => !excludedFields.has(f.name)));
+
 	let extraFieldNames = $derived(activeFields.map((f) => f.name));
+
+	let scrollElement = $state<HTMLDivElement | null>(null);
+
+	const virtualizer = createVirtualizer({
+		count: 0,
+		getScrollElement: () => scrollElement,
+		estimateSize: () => 28,
+		overscan: 15
+	});
+
+	$effect(() => {
+		const count = logs.length;
+		const el = scrollElement;
+		wrapMode;
+		extraFieldNames;
+		untrack(() => {
+			$virtualizer.setOptions({
+				count,
+				getScrollElement: () => el
+			});
+			$virtualizer.measure();
+		});
+	});
 
 	const BATCH_SIZE = 50;
 
@@ -106,6 +136,7 @@
 				logs = [...logs, ...result.hits];
 			} else {
 				logs = result.hits;
+				$virtualizer.scrollToIndex(0);
 			}
 			numHits = result.numHits;
 			hasSearched = true;
@@ -129,19 +160,15 @@
 		}
 	}
 
-	let lastScrollTop = 0;
+	function handleScroll() {
+		const items = $virtualizer.getVirtualItems();
+		const lastItem = items[items.length - 1];
+		if (!lastItem) return;
 
-	function handleScroll(event: Event) {
-		const target = event.target as HTMLElement;
-		if (target.scrollTop === lastScrollTop) return;
-		lastScrollTop = target.scrollTop;
-		const nearBottom = target.scrollHeight - target.scrollTop - target.clientHeight < 200;
-		if (nearBottom && !loading && logs.length < numHits) {
+		if (lastItem.index >= logs.length - 10 && !loading && logs.length < numHits) {
 			search(true);
 		}
 	}
-
-	let canLoadMore = $derived(logs.length < numHits);
 </script>
 
 <div class="flex h-full w-full">
@@ -159,7 +186,7 @@
 		<div class="border-b border-base-300 bg-base-100 px-4 py-3">
 			<div class="flex w-full items-center gap-2">
 				<select
-					class="select select-bordered select-sm w-48"
+					class="select-bordered select w-48 select-sm"
 					value={selectedSourceId}
 					onchange={(e) => handleSourceChange(Number(e.currentTarget.value))}
 				>
@@ -170,14 +197,14 @@
 
 				<input
 					type="text"
-					class="input input-bordered input-sm flex-1"
+					class="input-bordered input input-sm flex-1"
 					placeholder="Lucene query (e.g. level:error AND service:api)"
 					bind:value={queryText}
 					onkeydown={handleKeydown}
 				/>
 
 				<button
-					class="btn btn-primary btn-sm"
+					class="btn btn-sm btn-primary"
 					onclick={() => search()}
 					disabled={loading || !selectedSourceId}
 				>
@@ -206,10 +233,14 @@
 		</div>
 
 		<!-- Log stream -->
-		<div class="min-h-0 flex-1 overflow-auto bg-base-200/30" onscroll={handleScroll}>
+		<div
+			bind:this={scrollElement}
+			class="min-h-0 flex-1 overflow-auto bg-base-200/30"
+			onscroll={handleScroll}
+		>
 			{#if errorMessage}
 				<div class="p-4">
-					<div class="alert alert-error text-sm">{errorMessage}</div>
+					<div class="alert text-sm alert-error">{errorMessage}</div>
 				</div>
 			{:else if !hasSearched}
 				<div class="flex h-full items-center justify-center">
@@ -220,20 +251,32 @@
 					<p class="text-sm text-base-content/40">No logs found</p>
 				</div>
 			{:else}
-				<div class="w-fit min-w-full">
-					{#each logs as hit, i (i)}
-						<LogRow
-							{hit}
-							{wrapMode}
-							levelField={selectedSource?.levelField ?? 'level'}
-							timestampField={selectedSource?.timestampField ?? 'timestamp'}
-							messageField={selectedSource?.messageField ?? 'message'}
-							extraFields={extraFieldNames}
-						/>
+				<div
+					class="w-fit min-w-full"
+					style="height: {$virtualizer.getTotalSize()}px; position: relative;"
+				>
+					{#each $virtualizer.getVirtualItems() as row (row.index)}
+						<div
+							data-index={row.index}
+							use:$virtualizer.measureElement
+							style="position: absolute; top: 0; left: 0; width: 100%; transform: translateY({row.start}px);"
+						>
+							<LogRow
+								hit={logs[row.index]}
+								{wrapMode}
+								levelField={selectedSource?.levelField ?? 'level'}
+								timestampField={selectedSource?.timestampField ?? 'timestamp'}
+								messageField={selectedSource?.messageField ?? 'message'}
+								extraFields={extraFieldNames}
+							/>
+						</div>
 					{/each}
 					{#if loading}
-						<div class="flex justify-center py-4">
-							<span class="loading loading-spinner loading-sm"></span>
+						<div
+							class="flex justify-center py-4"
+							style="position: absolute; top: 0; left: 0; width: 100%; transform: translateY({$virtualizer.getTotalSize()}px);"
+						>
+							<span class="loading loading-sm loading-spinner"></span>
 						</div>
 					{/if}
 				</div>
