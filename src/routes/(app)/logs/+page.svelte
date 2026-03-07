@@ -48,15 +48,30 @@
 	let _maxRawWidths: Record<string, number> = {};
 	let columnWidths = $state<Record<string, number>>({});
 
+	function getNestedValue(obj: Record<string, unknown>, path: string): unknown {
+		let current: unknown = obj;
+		for (const key of path.split('.')) {
+			if (current === null || current === undefined || typeof current !== 'object') return undefined;
+			current = (current as Record<string, unknown>)[key];
+		}
+		return current;
+	}
+
+	function formatFieldValue(val: unknown): string {
+		if (val === undefined || val === null) return '';
+		if (typeof val === 'object') return JSON.stringify(val);
+		return String(val);
+	}
+
 	function updateColumnWidths(newLogs: Record<string, unknown>[], fields: string[], reset = false) {
 		if (reset) _maxRawWidths = {};
 
 		for (const field of fields) {
-			if (!(field in _maxRawWidths)) _maxRawWidths[field] = field.length;
+			if (!(field in _maxRawWidths)) _maxRawWidths[field] = 0;
 			for (const log of newLogs) {
-				const val = log[field];
+				const val = getNestedValue(log, field);
 				if (val !== undefined && val !== null) {
-					_maxRawWidths[field] = Math.max(_maxRawWidths[field], String(val).length);
+					_maxRawWidths[field] = Math.max(_maxRawWidths[field], formatFieldValue(val).length);
 				}
 			}
 		}
@@ -71,7 +86,7 @@
 	$effect(() => {
 		const fields = extraFieldNames;
 		untrack(() => {
-			updateColumnWidths(logs, fields);
+			updateColumnWidths(logs, fields, true);
 		});
 	});
 

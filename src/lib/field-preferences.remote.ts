@@ -92,8 +92,21 @@ export const getIndexFields = command(getIndexFieldsSchema, async (data) => {
 
 	const fieldMappings = metadata.index_config.doc_mapping.field_mappings;
 
-	return fieldMappings.map((f) => ({
-		name: f.name,
-		type: f.type
-	}));
+	function flattenFields(
+		mappings: typeof fieldMappings,
+		prefix = ''
+	): { name: string; type: string }[] {
+		const result: { name: string; type: string }[] = [];
+		for (const f of mappings) {
+			const fullName = prefix ? `${prefix}.${f.name}` : f.name;
+			if (f.type === 'object' && f.field_mappings) {
+				result.push(...flattenFields(f.field_mappings, fullName));
+			} else {
+				result.push({ name: fullName, type: f.type });
+			}
+		}
+		return result;
+	}
+
+	return flattenFields(fieldMappings);
 });
