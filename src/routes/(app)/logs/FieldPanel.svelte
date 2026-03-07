@@ -44,8 +44,13 @@
 </script>
 
 <div class="flex h-full w-56 shrink-0 flex-col border-r border-base-300 bg-base-100">
-	<div class="border-b border-base-300 px-3 py-2">
-		<h3 class="text-xs font-semibold uppercase tracking-wider text-base-content/60">Fields</h3>
+	<div class="flex items-center border-b border-base-300 px-3 py-2">
+		<h3 class="flex-1 text-xs font-semibold uppercase tracking-wider text-base-content/60">Fields</h3>
+		{#if hasOverride && onreset}
+			<button class="btn btn-ghost btn-xs p-0" onclick={onreset} title="Reset to default fields">
+				<Icon icon="lucide:x" width="14" height="14" class="text-base-content/40" />
+			</button>
+		{/if}
 	</div>
 
 	{#if loading}
@@ -102,13 +107,5 @@
 			</div>
 		</div>
 
-		<!-- Reset button -->
-		{#if hasOverride && onreset}
-			<div class="border-t border-base-300 p-2">
-				<button class="btn btn-ghost btn-xs w-full" onclick={onreset}>
-					Reset to defaults
-				</button>
-			</div>
-		{/if}
 	{/if}
 </div>

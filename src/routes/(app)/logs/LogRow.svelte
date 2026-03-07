@@ -1,4 +1,6 @@
 <script lang="ts">
+	import JsonHighlight from './JsonHighlight.svelte';
+
 	let {
 		hit,
 		wrapMode,
@@ -83,6 +85,16 @@
 	}
 
 	const severity = $derived(extractSeverity(hit));
+
+	const prettyJson = $derived.by(() => {
+		if (wrapMode !== 'pretty') return null;
+		const message = extractMessage(hit);
+		try {
+			return JSON.stringify(JSON.parse(message), null, 2);
+		} catch {
+			return null;
+		}
+	});
 </script>
 
 <div
@@ -95,9 +107,14 @@
 			style="width: {columnWidths[field] ?? 'auto'}ch"
 		>{hit[field] ?? ''}</span>
 	{/each}
-	<span
-		class="py-px pl-2 text-base-content/80 {wrapMode !== 'none'
-			? 'break-all whitespace-pre-wrap'
-			: 'whitespace-nowrap'}">{formatContent(hit, wrapMode)}</span
-	>
+	{#if prettyJson}
+		<span class="py-px pl-2 text-base-content/80 break-all whitespace-pre-wrap">
+			<JsonHighlight code={prettyJson} />
+		</span>
+	{:else}
+		<span
+			class="py-px pl-2 text-base-content/80 {wrapMode !== 'none'
+				? 'break-all whitespace-pre-wrap'
+				: 'whitespace-nowrap'}">{formatContent(hit, wrapMode)}</span>
+	{/if}
 </div>

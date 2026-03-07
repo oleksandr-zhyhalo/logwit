@@ -45,6 +45,7 @@
 		"@iconify/svelte": "^5.2.1",
 		"daisyui": "^5.5.19",
 		"quickwit-js": "^0.3.0",
+		"shiki": "^4.0.1",
 		"svelte-dnd-action": "^0.9.69",
 		"valibot": "^1.2.0"
 	}
