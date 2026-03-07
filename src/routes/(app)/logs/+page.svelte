@@ -83,8 +83,11 @@
 	async function loadSources() {
 		sources = await getSources();
 		if (sources.length > 0 && selectedSourceId === null) {
-			selectedSourceId = sources[0].id;
-			loadFieldsForSource(sources[0].id);
+			const saved = localStorage.getItem('selectedSourceId');
+			const savedId = saved ? Number(saved) : null;
+			const id = savedId && sources.some((s) => s.id === savedId) ? savedId : sources[0].id;
+			selectedSourceId = id;
+			loadFieldsForSource(id);
 		}
 	}
 
@@ -110,6 +113,7 @@
 
 	function handleSourceChange(sourceId: number) {
 		selectedSourceId = sourceId;
+		localStorage.setItem('selectedSourceId', String(sourceId));
 		loadFieldsForSource(sourceId);
 	}
 

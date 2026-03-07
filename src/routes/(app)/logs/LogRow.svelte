@@ -51,7 +51,8 @@
 	function extractTimestamp(doc: Record<string, unknown>): string {
 		const raw = doc[timestampField];
 		if (!raw) return '';
-		const date = new Date(raw as string | number);
+		const value = typeof raw === 'number' && raw < 10_000_000_000 ? raw * 1000 : raw;
+		const date = new Date(value as string | number);
 		if (isNaN(date.getTime())) return String(raw);
 		const y = date.getFullYear();
 		const mo = String(date.getMonth() + 1).padStart(2, '0');
