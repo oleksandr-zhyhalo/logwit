@@ -84,7 +84,7 @@
 </script>
 
 <div
-	class="flex items-stretch border-b border-base-content/5 font-mono text-[13px] leading-[22px] hover:bg-white/[0.03]"
+	class="flex cursor-pointer items-stretch border-b border-base-content/5 font-mono text-[13px] leading-[22px] hover:bg-base-content/[0.07]"
 >
 	<div class="w-1 shrink-0 rounded-full {severityColor(severity)}"></div>
 	<span class="shrink-0 py-px pl-3 text-base-content/40">{extractTimestamp(hit)}</span>

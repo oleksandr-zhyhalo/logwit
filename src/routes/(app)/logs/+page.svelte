@@ -55,12 +55,13 @@
 	$effect(() => {
 		const count = logs.length;
 		const el = scrollElement;
-		wrapMode;
+		const mode = wrapMode;
 		extraFieldNames;
 		untrack(() => {
 			$virtualizer.setOptions({
 				count,
-				getScrollElement: () => el
+				getScrollElement: () => el,
+				estimateSize: () => (mode === 'none' ? 28 : 80)
 			});
 			$virtualizer.measure();
 		});
