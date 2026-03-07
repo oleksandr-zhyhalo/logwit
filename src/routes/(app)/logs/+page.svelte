@@ -7,7 +7,6 @@
 		deleteFieldPreference,
 		getIndexFields
 	} from '$lib/field-preferences.remote';
-	import { createVirtualizer } from '@tanstack/svelte-virtual';
 	import { untrack } from 'svelte';
 	import type { Source } from '$lib/types';
 	import TimeRangeBar from './TimeRangeBar.svelte';
@@ -77,28 +76,6 @@
 	});
 
 	let scrollElement = $state<HTMLDivElement | null>(null);
-
-	const virtualizer = createVirtualizer({
-		count: 0,
-		getScrollElement: () => scrollElement,
-		estimateSize: () => 28,
-		overscan: 15
-	});
-
-	$effect(() => {
-		const count = logs.length;
-		const el = scrollElement;
-		const mode = wrapMode;
-		extraFieldNames;
-		untrack(() => {
-			$virtualizer.setOptions({
-				count,
-				getScrollElement: () => el,
-				estimateSize: () => 28
-			});
-			$virtualizer.measure();
-		});
-	});
 
 	const BATCH_SIZE = 50;
 
@@ -177,7 +154,7 @@
 			} else {
 				logs = result.hits;
 				updateColumnWidths(result.hits, extraFieldNames, true);
-				$virtualizer.scrollToIndex(0);
+				scrollElement?.scrollTo(0, 0);
 			}
 			numHits = result.numHits;
 			hasSearched = true;
@@ -202,11 +179,9 @@
 	}
 
 	function handleScroll() {
-		const items = $virtualizer.getVirtualItems();
-		const lastItem = items[items.length - 1];
-		if (!lastItem) return;
-
-		if (lastItem.index >= logs.length - 10 && !loading && logs.length < numHits) {
+		if (!scrollElement) return;
+		const { scrollTop, scrollHeight, clientHeight } = scrollElement;
+		if (scrollHeight - scrollTop - clientHeight < 300 && !loading && logs.length < numHits) {
 			search(true);
 		}
 	}
@@ -292,32 +267,20 @@
 					<p class="text-sm text-base-content/40">No logs found</p>
 				</div>
 			{:else}
-				<div
-					class="w-fit min-w-full"
-					style="height: {$virtualizer.getTotalSize()}px; position: relative;"
-				>
-					{#each $virtualizer.getVirtualItems() as row (row.index)}
-						<div
-							data-index={row.index}
-							use:$virtualizer.measureElement
-							style="position: absolute; top: 0; left: 0; width: 100%; transform: translateY({row.start}px);"
-						>
-							<LogRow
-								hit={logs[row.index]}
-								{wrapMode}
-								levelField={selectedSource?.levelField ?? 'level'}
-								timestampField={selectedSource?.timestampField ?? 'timestamp'}
-								messageField={selectedSource?.messageField ?? 'message'}
-								extraFields={extraFieldNames}
-								{columnWidths}
-							/>
-						</div>
+				<div class="w-fit min-w-full">
+					{#each logs as hit, i (i)}
+						<LogRow
+							{hit}
+							{wrapMode}
+							levelField={selectedSource?.levelField ?? 'level'}
+							timestampField={selectedSource?.timestampField ?? 'timestamp'}
+							messageField={selectedSource?.messageField ?? 'message'}
+							extraFields={extraFieldNames}
+							{columnWidths}
+						/>
 					{/each}
 					{#if loading}
-						<div
-							class="flex justify-center py-4"
-							style="position: absolute; top: 0; left: 0; width: 100%; transform: translateY({$virtualizer.getTotalSize()}px);"
-						>
+						<div class="flex justify-center py-4">
 							<span class="loading loading-sm loading-spinner"></span>
 						</div>
 					{/if}
