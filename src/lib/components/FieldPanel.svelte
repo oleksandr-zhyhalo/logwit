@@ -6,15 +6,11 @@
 		availableFields,
 		activeFields = $bindable(),
 		onchange,
-		onreset,
-		hasOverride = false,
 		loading = false
 	}: {
 		availableFields: { name: string; type: string }[];
 		activeFields: { id: string; name: string }[];
 		onchange?: (fields: string[]) => void;
-		onreset?: () => void;
-		hasOverride?: boolean;
 		loading?: boolean;
 	} = $props();
 
@@ -56,11 +52,6 @@
 			/>
 			<h3 class="flex-1 text-left text-xs font-semibold uppercase tracking-wider text-base-content/60">Fields</h3>
 		</button>
-		{#if hasOverride && onreset}
-			<button class="btn btn-ghost btn-xs p-0" onclick={onreset} title="Reset to default fields">
-				<Icon icon="lucide:x" width="14" height="14" class="text-base-content/40" />
-			</button>
-		{/if}
 	</div>
 
 	{#if loading}

@@ -2,7 +2,7 @@ import { command } from '$app/server';
 import { error } from '@sveltejs/kit';
 import { db } from '$lib/server/db';
 import { userPreference, source } from '$lib/server/db/schema';
-import { eq, and, isNull } from 'drizzle-orm';
+import { eq, and } from 'drizzle-orm';
 import { QuickwitClient } from 'quickwit-js';
 import {
 	getPreferenceSchema,
@@ -17,72 +17,34 @@ import { normalizeQuickwitUrl } from '$lib/utils';
 export const getPreference = command(getPreferenceSchema, async (data) => {
 	const user = requireUser();
 
-	// Try per-source first
-	if (data.sourceId !== null) {
-		const [pref] = await db
-			.select()
-			.from(userPreference)
-			.where(
-				and(
-					eq(userPreference.userId, user.id),
-					eq(userPreference.sourceId, data.sourceId)
-				)
-			);
-		if (pref) {
-			return {
-				displayFields: (pref.displayFields as string[]) ?? [],
-				quickFilterFields: (pref.quickFilterFields as string[]) ?? [],
-				isOverride: true
-			};
-		}
-	}
-
-	// Fallback to global default
-	const [globalPref] = await db
+	const [pref] = await db
 		.select()
 		.from(userPreference)
 		.where(
 			and(
 				eq(userPreference.userId, user.id),
-				isNull(userPreference.sourceId)
+				eq(userPreference.sourceId, data.sourceId)
 			)
 		);
 
 	return {
-		displayFields: (globalPref?.displayFields as string[]) ?? [],
-		quickFilterFields: (globalPref?.quickFilterFields as string[]) ?? [],
-		isOverride: false
+		displayFields: (pref?.displayFields as string[]) ?? [],
+		quickFilterFields: (pref?.quickFilterFields as string[]) ?? []
 	};
 });
 
 async function upsertPreference(
 	userId: string,
-	sourceId: number | null,
+	sourceId: number,
 	set: Partial<{ displayFields: string[]; quickFilterFields: string[] }>
 ) {
-	if (sourceId === null) {
-		// NULL != NULL in PostgreSQL, so ON CONFLICT won't match. Handle manually.
-		const [existing] = await db
-			.select()
-			.from(userPreference)
-			.where(and(eq(userPreference.userId, userId), isNull(userPreference.sourceId)));
-		if (existing) {
-			await db
-				.update(userPreference)
-				.set({ ...set, updatedAt: new Date() })
-				.where(eq(userPreference.id, existing.id));
-		} else {
-			await db.insert(userPreference).values({ userId, sourceId: null, ...set });
-		}
-	} else {
-		await db
-			.insert(userPreference)
-			.values({ userId, sourceId, ...set })
-			.onConflictDoUpdate({
-				target: [userPreference.userId, userPreference.sourceId],
-				set: { ...set, updatedAt: new Date() }
-			});
-	}
+	await db
+		.insert(userPreference)
+		.values({ userId, sourceId, ...set })
+		.onConflictDoUpdate({
+			target: [userPreference.userId, userPreference.sourceId],
+			set: { ...set, updatedAt: new Date() }
+		});
 }
 
 export const saveDisplayFields = command(saveDisplayFieldsSchema, async (data) => {

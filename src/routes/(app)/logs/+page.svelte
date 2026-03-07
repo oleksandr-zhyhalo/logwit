@@ -4,7 +4,7 @@
 	import {
 		getPreference,
 		saveDisplayFields,
-		deletePreference,
+		saveQuickFilterFields,
 		getIndexFields
 	} from '$lib/api/preferences.remote';
 	import { untrack } from 'svelte';
@@ -36,7 +36,6 @@
 
 	let indexFields = $state<{ name: string; type: string }[]>([]);
 	let activeFields = $state<{ id: string; name: string }[]>([]);
-	let hasOverride = $state(false);
 	let fieldsLoading = $state(false);
 
 	let excludedFields = $derived(
@@ -108,7 +107,6 @@
 			]);
 			indexFields = fields;
 			activeFields = pref.displayFields.map((name) => ({ id: name, name }));
-			hasOverride = pref.isOverride;
 
 			// Load quick filter fields; default to source's levelField
 			quickFilterFields = pref.quickFilterFields.length > 0
@@ -141,10 +139,27 @@
 		}, 500);
 	}
 
-	async function handleFieldsReset() {
-		if (!selectedSourceId) return;
-		await deletePreference({ sourceId: selectedSourceId });
-		await loadFieldsForSource(selectedSourceId);
+	let quickFilterSaveTimeout: ReturnType<typeof setTimeout>;
+	function handleQuickFilterFieldsChange(fields: string[]) {
+		quickFilterFields = fields;
+		// Clean aggregations/activeFilters for removed fields
+		const fieldSet = new Set(fields);
+		aggregations = Object.fromEntries(
+			Object.entries(aggregations).filter(([k]) => fieldSet.has(k))
+		);
+		const cleanedFilters = Object.fromEntries(
+			Object.entries(activeFilters).filter(([k]) => fieldSet.has(k))
+		);
+		if (JSON.stringify(cleanedFilters) !== JSON.stringify(activeFilters)) {
+			activeFilters = cleanedFilters;
+		}
+		clearTimeout(quickFilterSaveTimeout);
+		quickFilterSaveTimeout = setTimeout(() => {
+			if (selectedSourceId) {
+				saveQuickFilterFields({ sourceId: selectedSourceId, fields });
+			}
+			if (hasSearched) search();
+		}, 500);
 	}
 
 	async function search(append = false) {
@@ -170,9 +185,20 @@
 
 			// Update aggregations only from unfiltered searches so filter
 			// values don't disappear when the user narrows results
-			const hasActiveFilters = Object.keys(activeFilters).length > 0;
-			if (!append && result.aggregations && !hasActiveFilters) {
-				aggregations = result.aggregations;
+			if (!append && result.aggregations) {
+				const hasActiveFilters = Object.keys(activeFilters).length > 0;
+				if (!hasActiveFilters) {
+					aggregations = result.aggregations;
+				} else {
+					// Merge in aggregations for new fields without overwriting existing
+					const merged = { ...aggregations };
+					for (const [field, values] of Object.entries(result.aggregations)) {
+						if (!(field in merged)) {
+							merged[field] = values;
+						}
+					}
+					aggregations = merged;
+				}
 			}
 
 			if (append) {
@@ -228,13 +254,13 @@
 			{aggregations}
 			bind:activeFilters
 			onfilter={handleFilterChange}
+			availableFields={panelAvailableFields}
+			onconfigchange={handleQuickFilterFieldsChange}
 		/>
 		<FieldPanel
 			availableFields={panelAvailableFields}
 			bind:activeFields
 			onchange={handleFieldsChange}
-			onreset={handleFieldsReset}
-			{hasOverride}
 			loading={fieldsLoading}
 		/>
 	</div>

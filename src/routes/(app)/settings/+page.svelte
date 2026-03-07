@@ -1,8 +1,6 @@
 <script lang="ts">
 	import { getSources, createSource } from '$lib/api/sources.remote';
-	import { getPreference, saveDisplayFields, saveQuickFilterFields, getIndexFields } from '$lib/api/preferences.remote';
 	import SourceCard from './SourceCard.svelte';
-	import FieldPanel from '$lib/components/FieldPanel.svelte';
 	import type { Source } from '$lib/types';
 
 	let sources = $state<Source[]>([]);
@@ -44,52 +42,6 @@
 	function handleDelete(id: number) {
 		sources = sources.filter((s) => s.id !== id);
 	}
-
-	let globalActiveFields = $state<{ id: string; name: string }[]>([]);
-	let globalQuickFilterFields = $state<{ id: string; name: string }[]>([]);
-	let settingsIndexFields = $state<{ name: string; type: string }[]>([]);
-	let settingsSourceId = $state<number | null>(null);
-	let settingsFieldsLoading = $state(false);
-
-	async function loadGlobalPreference() {
-		const pref = await getPreference({ sourceId: null });
-		globalActiveFields = pref.displayFields.map((name: string) => ({ id: name, name }));
-		globalQuickFilterFields = pref.quickFilterFields.map((name: string) => ({ id: name, name }));
-	}
-
-	loadGlobalPreference();
-
-	async function loadSettingsFields(sourceId: number) {
-		settingsFieldsLoading = true;
-		try {
-			settingsIndexFields = await getIndexFields({ sourceId });
-		} catch {
-			settingsIndexFields = [];
-		} finally {
-			settingsFieldsLoading = false;
-		}
-	}
-
-	function handleSettingsSourceChange(sourceId: number) {
-		settingsSourceId = sourceId;
-		loadSettingsFields(sourceId);
-	}
-
-	let globalSaveTimeout: ReturnType<typeof setTimeout>;
-	function handleGlobalFieldsChange(fields: string[]) {
-		clearTimeout(globalSaveTimeout);
-		globalSaveTimeout = setTimeout(() => {
-			saveDisplayFields({ sourceId: null, fields });
-		}, 500);
-	}
-
-	let globalQuickFilterSaveTimeout: ReturnType<typeof setTimeout>;
-	function handleGlobalQuickFilterFieldsChange(fields: string[]) {
-		clearTimeout(globalQuickFilterSaveTimeout);
-		globalQuickFilterSaveTimeout = setTimeout(() => {
-			saveQuickFilterFields({ sourceId: null, fields });
-		}, 500);
-	}
 </script>
 
 <div class="h-full overflow-y-auto">
@@ -123,69 +75,6 @@
 					<SourceCard {source} onsave={handleSave} ondelete={handleDelete} />
 				{/each}
 			{/if}
-		</div>
-	</section>
-
-	<section class="mt-8">
-		<div class="py-4">
-			<h2 class="text-xl font-semibold">Default Display Fields</h2>
-			<p class="text-sm text-base-content/60">
-				Configure which extra fields appear in log rows by default for all sources.
-				Select a source to discover available fields.
-			</p>
-		</div>
-
-		<div class="card border border-base-300 bg-base-100">
-			<div class="card-body p-4">
-				<select
-					class="select select-bordered select-sm w-48"
-					value={settingsSourceId}
-				onchange={(e) => handleSettingsSourceChange(Number(e.currentTarget.value))}
-				>
-					<option value={null} disabled selected={settingsSourceId === null}>Select source to discover fields</option>
-					{#each sources as src (src.id)}
-						<option value={src.id}>{src.name}</option>
-					{/each}
-				</select>
-
-				{#if settingsSourceId}
-					<div class="mt-3 h-64">
-						<FieldPanel
-							availableFields={settingsIndexFields}
-							bind:activeFields={globalActiveFields}
-							onchange={handleGlobalFieldsChange}
-							loading={settingsFieldsLoading}
-						/>
-					</div>
-				{/if}
-			</div>
-		</div>
-	</section>
-
-	<section class="mt-8">
-		<div class="py-4">
-			<h2 class="text-xl font-semibold">Default Quick Filters</h2>
-			<p class="text-sm text-base-content/60">
-				Configure which fields appear in the quick filter sidebar for all sources.
-				Select a source above to discover available fields.
-			</p>
-		</div>
-
-		<div class="card border border-base-300 bg-base-100">
-			<div class="card-body p-4">
-				{#if !settingsSourceId}
-					<p class="text-sm text-base-content/40">Select a source above to discover fields</p>
-				{:else}
-					<div class="mt-3 h-64">
-						<FieldPanel
-							availableFields={settingsIndexFields}
-							bind:activeFields={globalQuickFilterFields}
-							onchange={handleGlobalQuickFilterFieldsChange}
-							loading={settingsFieldsLoading}
-						/>
-					</div>
-				{/if}
-			</div>
 		</div>
 	</section>
 </div>

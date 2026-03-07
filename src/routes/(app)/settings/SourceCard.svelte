@@ -5,6 +5,8 @@
 		deleteSource,
 		testSourceConnection
 	} from '$lib/api/sources.remote';
+	import ChipFieldSelector from '$lib/components/ChipFieldSelector.svelte';
+	import { getPreference, saveDisplayFields, saveQuickFilterFields, getIndexFields } from '$lib/api/preferences.remote';
 	import type { Source } from '$lib/types';
 
 	let {
@@ -49,6 +51,59 @@
 	let testResult: { success: boolean; error?: string } | null = $state(null);
 	let errorMessage = $state('');
 	let showDeleteConfirm = $state(false);
+
+	let displayFieldsExpanded = $state(false);
+	let quickFiltersExpanded = $state(false);
+	let fieldsLoaded = $state(false);
+	let fieldsLoading = $state(false);
+	let availableFields = $state<{ name: string; type: string }[]>([]);
+	let activeDisplayFields = $state<{ id: string; name: string }[]>([]);
+	let activeQuickFilterFields = $state<{ id: string; name: string }[]>([]);
+
+	async function loadFields() {
+		if (fieldsLoaded || fieldsLoading) return;
+		fieldsLoading = true;
+		try {
+			const [fields, pref] = await Promise.all([
+				getIndexFields({ sourceId: source.id }),
+				getPreference({ sourceId: source.id })
+			]);
+			availableFields = fields;
+			activeDisplayFields = pref.displayFields.map((name: string) => ({ id: name, name }));
+			activeQuickFilterFields = pref.quickFilterFields.map((name: string) => ({ id: name, name }));
+			fieldsLoaded = true;
+		} catch {
+			availableFields = [];
+		} finally {
+			fieldsLoading = false;
+		}
+	}
+
+	function toggleDisplayFields() {
+		displayFieldsExpanded = !displayFieldsExpanded;
+		if (displayFieldsExpanded) loadFields();
+	}
+
+	function toggleQuickFilters() {
+		quickFiltersExpanded = !quickFiltersExpanded;
+		if (quickFiltersExpanded) loadFields();
+	}
+
+	let displaySaveTimeout: ReturnType<typeof setTimeout>;
+	function handleDisplayFieldsChange(fields: string[]) {
+		clearTimeout(displaySaveTimeout);
+		displaySaveTimeout = setTimeout(() => {
+			saveDisplayFields({ sourceId: source.id, fields });
+		}, 500);
+	}
+
+	let quickFilterSaveTimeout: ReturnType<typeof setTimeout>;
+	function handleQuickFilterFieldsChange(fields: string[]) {
+		clearTimeout(quickFilterSaveTimeout);
+		quickFilterSaveTimeout = setTimeout(() => {
+			saveQuickFilterFields({ sourceId: source.id, fields });
+		}, 500);
+	}
 
 	function startEdit() {
 		name = source.name;
@@ -179,6 +234,58 @@
 						<Icon icon="lucide:trash-2" width="16" height="16" />
 					</button>
 				</div>
+			</div>
+
+			<!-- Display Fields -->
+			<div class="mt-2 border-t border-base-300 pt-2">
+				<button class="flex w-full items-center gap-1 text-left" onclick={toggleDisplayFields}>
+					<Icon
+						icon={displayFieldsExpanded ? 'lucide:chevron-down' : 'lucide:chevron-right'}
+						width="14"
+						height="14"
+						class="text-base-content/40"
+					/>
+					<span class="text-xs font-semibold uppercase tracking-wider text-base-content/60">Display Fields</span>
+					{#if activeDisplayFields.length > 0 && !displayFieldsExpanded}
+						<span class="badge badge-xs badge-ghost ml-1">{activeDisplayFields.length}</span>
+					{/if}
+				</button>
+				{#if displayFieldsExpanded}
+					<div class="mt-2 pl-5">
+						<ChipFieldSelector
+							{availableFields}
+							bind:activeFields={activeDisplayFields}
+							onchange={handleDisplayFieldsChange}
+							loading={fieldsLoading}
+						/>
+					</div>
+				{/if}
+			</div>
+
+			<!-- Quick Filters -->
+			<div class="border-t border-base-300 pt-2">
+				<button class="flex w-full items-center gap-1 text-left" onclick={toggleQuickFilters}>
+					<Icon
+						icon={quickFiltersExpanded ? 'lucide:chevron-down' : 'lucide:chevron-right'}
+						width="14"
+						height="14"
+						class="text-base-content/40"
+					/>
+					<span class="text-xs font-semibold uppercase tracking-wider text-base-content/60">Quick Filters</span>
+					{#if activeQuickFilterFields.length > 0 && !quickFiltersExpanded}
+						<span class="badge badge-xs badge-ghost ml-1">{activeQuickFilterFields.length}</span>
+					{/if}
+				</button>
+				{#if quickFiltersExpanded}
+					<div class="mt-2 pl-5">
+						<ChipFieldSelector
+							{availableFields}
+							bind:activeFields={activeQuickFilterFields}
+							onchange={handleQuickFilterFieldsChange}
+							loading={fieldsLoading}
+						/>
+					</div>
+				{/if}
 			</div>
 		{/if}
 	</div>
