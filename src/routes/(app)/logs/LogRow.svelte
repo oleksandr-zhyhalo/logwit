@@ -22,22 +22,22 @@
 		return raw.toString().toLowerCase();
 	}
 
-	function severityColor(severity: string): string {
+	function severityBorderColor(severity: string): string {
 		switch (severity) {
 			case 'error':
 			case 'fatal':
 			case 'critical':
-				return 'bg-error';
+				return 'border-l-error';
 			case 'warn':
 			case 'warning':
-				return 'bg-warning';
+				return 'border-l-warning';
 			case 'debug':
 			case 'trace':
-				return 'bg-accent';
+				return 'border-l-accent';
 			case 'info':
-				return 'bg-info';
+				return 'border-l-info';
 			default:
-				return 'bg-base-content/30';
+				return 'border-l-base-content/30';
 		}
 	}
 
@@ -86,19 +86,18 @@
 </script>
 
 <div
-	class="flex cursor-pointer items-stretch border-b border-base-content/5 font-mono text-[13px] leading-[22px] hover:bg-base-content/[0.07]"
+	class="cursor-pointer border-l-4 pl-3 border-b border-base-content/5 font-mono text-[13px] leading-[22px] hover:bg-base-content/[0.07] {severityBorderColor(severity)} {wrapMode === 'none' ? 'flex items-stretch' : ''}"
 >
-	<div class="w-1 shrink-0 rounded-full {severityColor(severity)}"></div>
-	<span class="shrink-0 py-px pl-3 text-base-content/40">{extractTimestamp(hit)}</span>
+	<span class="shrink-0 py-px text-base-content/40">{extractTimestamp(hit)}</span>
 	{#each extraFields as field (field)}
 		<span
-			class="shrink-0 truncate py-px pl-2"
+			class="inline-block shrink-0 truncate py-px pl-2 align-top"
 			style="width: {columnWidths[field] ?? 'auto'}ch"
 		>{hit[field] ?? ''}</span>
 	{/each}
 	<span
 		class="py-px pl-2 text-base-content/80 {wrapMode !== 'none'
-			? 'min-w-0 break-all whitespace-pre-wrap'
+			? 'break-all whitespace-pre-wrap'
 			: 'whitespace-nowrap'}">{formatContent(hit, wrapMode)}</span
 	>
 </div>
