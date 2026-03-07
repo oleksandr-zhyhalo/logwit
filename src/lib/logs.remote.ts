@@ -22,13 +22,13 @@ export const searchLogs = command(searchLogsSchema, async (data) => {
 	const client = new QuickwitClient(endpoint);
 	const index = client.index(src.indexName);
 
-	let startTs: number;
-	let endTs: number;
+	let startTs: number | undefined;
+	let endTs: number | undefined;
 
 	if (data.startTimestamp !== undefined && data.endTimestamp !== undefined) {
 		startTs = data.startTimestamp;
 		endTs = data.endTimestamp;
-	} else {
+	} else if (data.timeRange !== 'all') {
 		endTs = Math.floor(Date.now() / 1000);
 		const rangeSeconds: Record<string, number> = {
 			'15m': 15 * 60,
@@ -42,10 +42,13 @@ export const searchLogs = command(searchLogsSchema, async (data) => {
 
 	const query = index
 		.query(data.query || '*')
-		.timeRange(startTs, endTs)
 		.limit(data.limit)
 		.offset(data.offset)
 		.sortBy(`+${src.timestampField}`);
+
+	if (startTs !== undefined && endTs !== undefined) {
+		query.timeRange(startTs, endTs);
+	}
 
 	const result = await index.search(query);
 

@@ -16,7 +16,7 @@
 	let sources = $state<Source[]>([]);
 	let selectedSourceId = $state<number | null>(null);
 	let queryText = $state('');
-	let timeRange = $state<'15m' | '1h' | '6h' | '24h' | '7d'>('15m');
+	let timeRange = $state<'15m' | '1h' | '6h' | '24h' | '7d' | 'all'>('15m');
 	let logs = $state<Record<string, unknown>[]>([]);
 	let numHits = $state(0);
 	let loading = $state(false);

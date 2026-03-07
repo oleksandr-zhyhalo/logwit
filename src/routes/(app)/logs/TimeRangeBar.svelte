@@ -7,7 +7,7 @@
 		onchange: (range: string) => void;
 	} = $props();
 
-	const presets = ['15m', '1h', '6h', '24h', '7d'];
+	const presets = ['15m', '1h', '6h', '24h', '7d', 'all'];
 </script>
 
 <div class="flex gap-1">
