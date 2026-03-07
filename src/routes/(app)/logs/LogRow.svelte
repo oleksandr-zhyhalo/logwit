@@ -66,8 +66,15 @@
 	}
 
 	function formatContent(doc: Record<string, unknown>, mode: 'none' | 'wrap' | 'pretty'): string {
-		if (mode === 'pretty') return JSON.stringify(doc, null, 2);
-		return extractMessage(doc);
+		const message = extractMessage(doc);
+		if (mode === 'pretty') {
+			try {
+				return JSON.stringify(JSON.parse(message), null, 2);
+			} catch {
+				return message;
+			}
+		}
+		return message;
 	}
 
 	const severity = $derived(extractSeverity(hit));
