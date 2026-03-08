@@ -49,7 +49,8 @@
 	);
 
 	let panelAvailableFields = $derived(indexFields.filter((f) => !excludedFields.has(f.name)));
-	let quickFilterAvailableFields = $derived(panelAvailableFields.filter((f) => f.fast));
+	// let quickFilterAvailableFields = $derived(panelAvailableFields.filter((f) => f.fast));
+	let quickFilterAvailableFields = $derived(panelAvailableFields);
 
 	let extraFieldNames = $derived(activeFields.map((f) => f.name));
 

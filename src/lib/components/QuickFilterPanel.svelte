@@ -1,7 +1,7 @@
 <script lang="ts">
 	import Icon from '@iconify/svelte';
 	import { SvelteSet } from 'svelte/reactivity';
-	import ChipFieldSelector from '$lib/components/ChipFieldSelector.svelte';
+	import { dndzone } from 'svelte-dnd-action';
 
 	let {
 		fields,
@@ -89,6 +89,10 @@
 		}
 	});
 
+	let filteredConfigAvailable = $derived(
+		availableFields.filter((f) => !configFields.some((a) => a.name === f.name))
+	);
+
 	function enterConfigMode() {
 		configFields = fields.map((name) => ({ id: name, name }));
 		configMode = true;
@@ -98,8 +102,23 @@
 		configMode = false;
 	}
 
-	function handleConfigChange(newFields: string[]) {
-		onconfigchange?.(newFields);
+	function handleConfigDndConsider(e: CustomEvent<{ items: typeof configFields }>) {
+		configFields = e.detail.items;
+	}
+
+	function handleConfigDndFinalize(e: CustomEvent<{ items: typeof configFields }>) {
+		configFields = e.detail.items;
+		onconfigchange?.(configFields.map((f) => f.name));
+	}
+
+	function addConfigField(name: string) {
+		configFields = [...configFields, { id: name, name }];
+		onconfigchange?.(configFields.map((f) => f.name));
+	}
+
+	function removeConfigField(name: string) {
+		configFields = configFields.filter((f) => f.name !== name);
+		onconfigchange?.(configFields.map((f) => f.name));
 	}
 
 	function toggleSection(field: string) {
@@ -179,12 +198,58 @@
 
 		{#if !collapsed}
 			{#if configMode}
-				<div class="px-3 pb-3">
-					<ChipFieldSelector
-						{availableFields}
-						bind:activeFields={configFields}
-						onchange={handleConfigChange}
-					/>
+				<div class="flex flex-col">
+					<div class="border-t border-base-300/50 p-2">
+						<p class="mb-1 text-xs font-medium text-base-content/50">Active</p>
+						{#if configFields.length === 0}
+							<p class="px-1 py-2 text-xs text-base-content/30">No filter fields</p>
+						{:else}
+							<div
+								use:dndzone={{ items: configFields, flipDurationMs: 150, type: 'config-fields' }}
+								onconsider={handleConfigDndConsider}
+								onfinalize={handleConfigDndFinalize}
+								class="flex flex-col gap-1"
+							>
+								{#each configFields as field (field.id)}
+									<div class="flex items-center gap-1 rounded bg-base-200 px-2 py-1 text-xs">
+										<Icon
+											icon="lucide:grip-vertical"
+											width="12"
+											height="12"
+											class="shrink-0 cursor-grab text-base-content/40"
+										/>
+										<span class="flex-1 truncate">{field.name}</span>
+										<button class="btn p-0 btn-ghost btn-xs" onclick={() => removeConfigField(field.name)}>
+											<Icon icon="lucide:x" width="12" height="12" />
+										</button>
+									</div>
+								{/each}
+							</div>
+						{/if}
+					</div>
+
+					{#if filteredConfigAvailable.length > 0}
+						<div class="border-t border-base-300/50 p-2">
+							<p class="mb-1 text-xs font-medium text-base-content/50">Available</p>
+							<div class="flex flex-col gap-0.5">
+								{#each filteredConfigAvailable as field (field.name)}
+									<button
+										class="flex w-full items-center gap-2 rounded px-2 py-1 text-left text-xs hover:bg-base-200"
+										onclick={() => addConfigField(field.name)}
+									>
+										<Icon
+											icon="lucide:plus"
+											width="12"
+											height="12"
+											class="shrink-0 text-base-content/40"
+										/>
+										<span class="truncate">{field.name}</span>
+										<span class="ml-auto text-[10px] text-base-content/30">{field.type}</span>
+									</button>
+								{/each}
+							</div>
+						</div>
+					{/if}
 				</div>
 			{:else if fields.length === 0}
 				<div class="px-3 pb-3">
