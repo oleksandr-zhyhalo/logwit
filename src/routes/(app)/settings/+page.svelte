@@ -1,6 +1,6 @@
 <script lang="ts">
 	import { getIndexes } from '$lib/api/indexes.remote';
-	import IndexConfigCard from './IndexConfigCard.svelte';
+	import IndexConfigCard from '$lib/components/IndexConfigCard.svelte';
 
 	let indexes = $state<{ indexId: string; indexUri: string }[]>([]);
 	let loaded = $state(false);

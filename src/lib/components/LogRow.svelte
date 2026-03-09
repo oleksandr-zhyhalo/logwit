@@ -1,6 +1,6 @@
 <script lang="ts">
 	import { getNestedValue, formatFieldValue } from '$lib/utils';
-	import JsonHighlight from './JsonHighlight.svelte';
+	import JsonHighlight from '$lib/components/JsonHighlight.svelte';
 
 	let {
 		hit,

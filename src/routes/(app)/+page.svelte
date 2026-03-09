@@ -16,7 +16,7 @@
 	import type { ParsedQuery } from '$lib/query-params';
 	import TimeRangePicker from '$lib/components/TimeRangePicker.svelte';
 	import { resolveTimeRange } from '$lib/utils';
-	import LogRow from './LogRow.svelte';
+	import LogRow from '$lib/components/LogRow.svelte';
 	import FieldPanel from '$lib/components/FieldPanel.svelte';
 	import QuickFilterPanel from '$lib/components/QuickFilterPanel.svelte';
 
