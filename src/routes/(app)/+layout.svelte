@@ -2,120 +2,62 @@
 	import Icon from '@iconify/svelte';
 	import { page } from '$app/state';
 	import { signOut } from '$lib/api/auth.remote';
-	import { browser } from '$app/environment';
 
 	let { children } = $props();
 
-	const titles: Record<string, string> = {
-		'/': 'Home',
-		'/logs': 'Logs',
-		'/settings': 'Settings'
-	};
-
-	let pageTitle = $derived(titles[page.url.pathname] ?? 'Logwit');
-
-	let collapsed = $state(browser ? localStorage.getItem('sidebar-collapsed') === 'true' : false);
-
-	function toggleSidebar() {
-		collapsed = !collapsed;
-		localStorage.setItem('sidebar-collapsed', String(collapsed));
-	}
-
-	const menuItems = [
-		{ href: '/', icon: 'lucide:house', label: 'Home', active: () => page.url.pathname === '/' },
-		{
-			href: '/logs',
-			icon: 'lucide:file-text',
-			label: 'Logs',
-			active: () => page.url.pathname.startsWith('/logs')
-		},
-		{
-			href: '/settings',
-			icon: 'lucide:settings',
-			label: 'Settings',
-			active: () => page.url.pathname.startsWith('/settings')
-		}
-	];
+	const user = $derived(page.data.user);
+	const initials = $derived(
+		user?.name
+			? user.name
+					.split(' ')
+					.map((n: string) => n[0])
+					.join('')
+					.toUpperCase()
+					.slice(0, 2)
+			: '?'
+	);
 </script>
 
-<div class="flex h-screen w-screen">
-	<aside
-		class="flex h-screen flex-col border-r border-base-300 bg-base-200 transition-all duration-200"
-		class:w-64={!collapsed}
-		class:w-16={collapsed}
-	>
-		<div
-			class="flex h-16 items-center border-b border-base-300 px-2"
-			class:justify-between={!collapsed}
-			class:justify-center={collapsed}
-		>
-			{#if !collapsed}
-				<p class="pl-2 text-xl font-semibold">Logwit</p>
-			{/if}
-			<button
-				class="btn btn-square btn-ghost btn-sm"
-				onclick={toggleSidebar}
-				aria-label={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
-			>
-				<Icon
-					icon={collapsed ? 'lucide:panel-left-open' : 'lucide:panel-left-close'}
-					width="16"
-					height="16"
-					class="opacity-70"
-				/>
-			</button>
-		</div>
-		<ul class="menu w-full flex-1 p-2" class:items-center={collapsed}>
-			{#each menuItems as item (item.href)}
-				<li class="w-full">
-					{#if collapsed}
-						<a
-							href={item.href}
-							class="tooltip tooltip-right flex justify-center"
-							class:menu-active={item.active()}
-							data-tip={item.label}
-						>
-							<Icon icon={item.icon} width="16" height="16" class="opacity-70" />
-						</a>
-					{:else}
-						<a href={item.href} class:menu-active={item.active()}>
-							<Icon icon={item.icon} width="16" height="16" class="opacity-70" />
-							{item.label}
-						</a>
-					{/if}
-				</li>
-			{/each}
-		</ul>
-		<div
-			class="border-t border-base-300 p-2"
-			class:flex={collapsed}
-			class:justify-center={collapsed}
-		>
-			{#if collapsed}
-				<button
-					class="tooltip btn tooltip-right btn-square btn-ghost btn-sm"
-					onclick={() => signOut()}
-					data-tip="Sign Out"
-				>
-					<Icon icon="lucide:log-out" width="14" height="14" class="opacity-70" />
-				</button>
-			{:else}
-				<button class="btn w-full btn-ghost btn-sm" onclick={() => signOut()}>
-					<Icon icon="lucide:log-out" width="14" height="14" class="opacity-70" />
-					Sign Out
-				</button>
-			{/if}
-		</div>
-	</aside>
+<div class="flex h-screen w-screen flex-col">
+	<div class="flex h-12 items-center justify-between border-b border-base-300 bg-base-100 px-4">
+		<p class="text-lg font-semibold">Logwit</p>
 
-	<div class="flex flex-1 flex-col overflow-hidden">
-		<div class="flex h-16 items-center border-b border-base-300 bg-white px-4">
-			<div class="mx-auto w-full max-w-6xl">
-				<h1 class="text-sm font-medium">{pageTitle}</h1>
+		<div class="dropdown dropdown-end">
+			<div tabindex="0" role="button" class="btn btn-circle btn-ghost btn-sm">
+				<div class="avatar avatar-placeholder">
+					<div class="bg-neutral text-neutral-content w-8 rounded-full">
+						<span class="text-xs">{initials}</span>
+					</div>
+				</div>
+			</div>
+			<!-- svelte-ignore a11y_no_noninteractive_tabindex -->
+			<div
+				tabindex="0"
+				class="dropdown-content menu z-50 mt-2 w-64 rounded-lg border border-base-300 bg-base-100 p-0 shadow-lg"
+			>
+				<div class="border-b border-base-300 px-4 py-3">
+					<p class="text-sm font-medium">{user?.name ?? 'User'}</p>
+					<p class="text-xs text-base-content/60">{user?.email ?? ''}</p>
+				</div>
+				<ul class="menu p-2">
+					<li>
+						<a href="/settings">
+							<Icon icon="lucide:settings" width="16" height="16" class="opacity-70" />
+							Settings
+						</a>
+					</li>
+				</ul>
+				<div class="border-t border-base-300 p-2">
+					<button class="btn btn-ghost btn-sm w-full justify-start" onclick={() => signOut()}>
+						<Icon icon="lucide:log-out" width="16" height="16" class="opacity-70" />
+						Log out
+					</button>
+				</div>
 			</div>
 		</div>
-		<div class="min-h-0 flex-1">
-			{@render children()}
-		</div>
+	</div>
+
+	<div class="min-h-0 flex-1">
+		{@render children()}
 	</div>
 </div>
