@@ -24,9 +24,7 @@
 		dndItems = activeFields.map((name) => ({ id: name, name }));
 	});
 
-	let filteredAvailable = $derived(
-		availableFields.filter((f) => !activeFields.includes(f.name))
-	);
+	let filteredAvailable = $derived(availableFields.filter((f) => !activeFields.includes(f.name)));
 
 	function handleDndConsider(e: CustomEvent<{ items: typeof dndItems }>) {
 		dndItems = e.detail.items;
@@ -89,7 +87,7 @@
 		</div>
 	{:else if !collapsed}
 		{#if activeFields.length === 0 && !configMode}
-			<div class="px-3 pb-3">
+			<div class="px-3 py-3">
 				<p class="text-[11px] text-base-content/30">Click the gear icon to add display fields</p>
 			</div>
 		{:else}
