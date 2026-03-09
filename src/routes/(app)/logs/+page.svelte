@@ -9,23 +9,30 @@
 	} from '$lib/api/preferences.remote';
 	import { untrack } from 'svelte';
 	import { browser } from '$app/environment';
+	import { goto } from '$app/navigation';
+	import { page } from '$app/state';
 	import { getNestedValue, formatFieldValue, combineQueryWithFilters } from '$lib/utils';
-	import type { Source, TimeRange, TimezoneMode } from '$lib/types';
+	import type { Source, TimeRange } from '$lib/types';
+	import { buildQueryUrl, serialize, hasNonDefaultParams } from '$lib/query-params';
+	import type { ParsedQuery } from '$lib/query-params';
 	import TimeRangePicker from '$lib/components/TimeRangePicker.svelte';
 	import { resolveTimeRange } from '$lib/utils';
 	import LogRow from './LogRow.svelte';
 	import FieldPanel from '$lib/components/FieldPanel.svelte';
 	import QuickFilterPanel from '$lib/components/QuickFilterPanel.svelte';
 
+	let { data } = $props();
+
 	let sources = $state<Source[]>([]);
 	let selectedSourceId = $state<number | null>(null);
-	let baseQuery = $state('');
-	let timeRange = $state<TimeRange>({ type: 'relative', preset: '15m' });
-	let timezoneMode = $state<TimezoneMode>('local');
+	let queryInput = $state('');
+	let timeRange = $derived(data.parsedQuery.timeRange);
+	let timezoneMode = $derived(data.parsedQuery.timezoneMode);
 	let quickFilterFields = $state<string[]>([]);
-	let activeFilters = $state<Record<string, string[]>>({});
+	let activeFilters = $derived(data.parsedQuery.filters);
 	let aggregations = $state<Record<string, string[]>>({});
-	let queryText = $derived(combineQueryWithFilters(baseQuery, activeFilters));
+	let urlSourceId = $derived(data.parsedQuery.sourceId);
+	let queryText = $derived(combineQueryWithFilters(queryInput, activeFilters));
 	let logs = $state<Record<string, unknown>[]>([]);
 	let numHits = $state(0);
 	let loading = $state(false);
@@ -92,6 +99,50 @@
 		});
 	});
 
+	// Sync queryInput from URL when URL changes (e.g. back/forward)
+	$effect(() => {
+		queryInput = data.parsedQuery.query;
+	});
+
+	// Track the last searched query to detect meaningful changes from navigation
+	let lastSearchedParams = $state('');
+
+	// Single reactive search trigger — watches URL state and auto-searches on meaningful changes.
+	// No event handler calls search() directly, except:
+	//   - loadFieldsForSource (source change needs fields loaded first)
+	//   - handleQuickFilterFieldsChange (field config isn't in URL)
+	$effect(() => {
+		const parsed = data.parsedQuery;
+		const currentParams = serialize(parsed).toString();
+
+		// Nothing changed
+		if (currentParams === lastSearchedParams) return;
+
+		// No source selected yet (bare /logs or source loading)
+		if (!parsed.sourceId) return;
+
+		// Source mismatch means loadFieldsForSource is handling it
+		if (parsed.sourceId !== selectedSourceId) return;
+
+		// Fields not loaded yet for this source
+		if (fieldsLoading) return;
+
+		// Either we've searched before, or this is a shared link with params
+		if (hasSearched || hasNonDefaultParams(parsed)) {
+			lastSearchedParams = currentParams;
+			search();
+		}
+	});
+
+	function navigateQuery(partial: Partial<ParsedQuery>, push = false) {
+		const url = buildQueryUrl(page.url.searchParams, partial);
+		goto(url, {
+			replaceState: !push,
+			keepFocus: true,
+			noScroll: true
+		});
+	}
+
 	let scrollElement = $state<HTMLDivElement | null>(null);
 
 	const BATCH_SIZE = 50;
@@ -99,10 +150,25 @@
 	async function loadSources() {
 		sources = await getSources();
 		if (sources.length > 0 && selectedSourceId === null) {
+			// URL source takes priority, then localStorage, then first
+			const urlId = urlSourceId;
 			const saved = browser ? localStorage.getItem('selectedSourceId') : null;
 			const savedId = saved ? Number(saved) : null;
-			const id = savedId && sources.some((s) => s.id === savedId) ? savedId : sources[0].id;
+
+			let id: number;
+			if (urlId !== null && sources.some((s) => s.id === urlId)) {
+				id = urlId;
+			} else if (savedId && sources.some((s) => s.id === savedId)) {
+				id = savedId;
+			} else {
+				id = sources[0].id;
+			}
+
 			selectedSourceId = id;
+			// Sync URL if source wasn't already there
+			if (urlId !== id) {
+				navigateQuery({ sourceId: id });
+			}
 			loadFieldsForSource(id);
 		}
 	}
@@ -138,7 +204,7 @@
 	function handleSourceChange(sourceId: number) {
 		selectedSourceId = sourceId;
 		localStorage.setItem('selectedSourceId', String(sourceId));
-		activeFilters = {};
+		navigateQuery({ sourceId, filters: {} });
 		aggregations = {};
 		loadFieldsForSource(sourceId);
 	}
@@ -167,7 +233,7 @@
 			Object.entries(activeFilters).filter(([k]) => fieldSet.has(k))
 		);
 		if (JSON.stringify(cleanedFilters) !== JSON.stringify(activeFilters)) {
-			activeFilters = cleanedFilters;
+			navigateQuery({ filters: cleanedFilters });
 		}
 		clearTimeout(quickFilterSaveTimeout);
 		quickFilterSaveTimeout = setTimeout(() => {
@@ -183,6 +249,10 @@
 
 		loading = true;
 		errorMessage = '';
+
+		if (!append) {
+			lastSearchedParams = serialize(data.parsedQuery).toString();
+		}
 
 		try {
 			const resolved = resolveTimeRange(timeRange);
@@ -237,22 +307,16 @@
 
 	function handleKeydown(event: KeyboardEvent) {
 		if (event.key === 'Enter') {
-			search();
+			navigateQuery({ query: queryInput }, true);
 		}
 	}
 
 	function handleTimeRangeChange(range: TimeRange) {
-		timeRange = range;
-		if (hasSearched) {
-			search();
-		}
+		navigateQuery({ timeRange: range });
 	}
 
 	function handleFilterChange(filters: Record<string, string[]>) {
-		activeFilters = filters;
-		if (hasSearched) {
-			search();
-		}
+		navigateQuery({ filters });
 	}
 
 	async function handleFieldValueSearch(field: string, searchTerm: string): Promise<string[]> {
@@ -285,7 +349,7 @@
 		<QuickFilterPanel
 			fields={quickFilterFields}
 			{aggregations}
-			bind:activeFilters
+			{activeFilters}
 			onfilter={handleFilterChange}
 			availableFields={quickFilterAvailableFields}
 			onconfigchange={handleQuickFilterFieldsChange}
@@ -318,7 +382,7 @@
 					type="text"
 					class="input-bordered input input-sm min-w-0 flex-1"
 					placeholder="Lucene query (e.g. level:error AND service:api)"
-					bind:value={baseQuery}
+					bind:value={queryInput}
 					onkeydown={handleKeydown}
 				/>
 
@@ -326,12 +390,12 @@
 					value={timeRange}
 					{timezoneMode}
 					onchange={handleTimeRangeChange}
-					ontimezonechange={(mode) => (timezoneMode = mode)}
+					ontimezonechange={(mode) => navigateQuery({ timezoneMode: mode })}
 				/>
 
 				<button
 					class="btn btn-sm btn-primary"
-					onclick={() => search()}
+					onclick={() => navigateQuery({ query: queryInput }, true)}
 					disabled={loading || !selectedSourceId}
 				>
 					{loading && !logs.length ? 'Searching...' : 'Search'}
