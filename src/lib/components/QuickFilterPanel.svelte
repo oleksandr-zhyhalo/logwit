@@ -281,13 +281,15 @@
 
 							{#if openSections.has(field)}
 								<div class="px-3 pb-2">
-									<input
-										type="text"
-										class="input input-xs mb-1.5 w-full border-base-300 bg-base-200/50"
-										placeholder="Search values..."
-										value={searchTerms[field] ?? ''}
-										oninput={(e) => handleSearchInput(field, e.currentTarget.value)}
-									/>
+									{#if (aggregations[field] ?? []).length > INITIAL_SHOW_COUNT}
+										<input
+											type="text"
+											class="input input-xs mb-1.5 w-full border-base-300 bg-base-200/50"
+											placeholder="Search values..."
+											value={searchTerms[field] ?? ''}
+											oninput={(e) => handleSearchInput(field, e.currentTarget.value)}
+										/>
+									{/if}
 									{#if loadingFields.has(field)}
 										<div class="flex items-center gap-2 py-1">
 											<span class="loading loading-xs loading-spinner"></span>
