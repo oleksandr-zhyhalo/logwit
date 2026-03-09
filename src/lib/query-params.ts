@@ -20,6 +20,7 @@ export function hasNonDefaultParams(state: ParsedQuery): boolean {
 	if (state.query !== '') return true;
 	if (Object.keys(state.filters).length > 0) return true;
 	if (state.timeRange.type === 'absolute') return true;
+	if (state.timeRange.type === 'relative' && state.timeRange.preset !== '15m') return true;
 	return false;
 }
 

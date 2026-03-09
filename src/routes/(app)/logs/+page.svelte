@@ -9,7 +9,7 @@
 	} from '$lib/api/preferences.remote';
 	import { untrack } from 'svelte';
 	import { browser } from '$app/environment';
-	import { goto } from '$app/navigation';
+	import { goto, afterNavigate } from '$app/navigation';
 	import { page } from '$app/state';
 	import { getNestedValue, formatFieldValue, combineQueryWithFilters } from '$lib/utils';
 	import type { Source, TimeRange } from '$lib/types';
@@ -25,7 +25,7 @@
 
 	let sources = $state<Source[]>([]);
 	let selectedSourceId = $state<number | null>(null);
-	let queryInput = $state('');
+	let queryInput = $state(data.parsedQuery.query);
 	let timeRange = $derived(data.parsedQuery.timeRange);
 	let timezoneMode = $derived(data.parsedQuery.timezoneMode);
 	let quickFilterFields = $state<string[]>([]);
@@ -99,8 +99,8 @@
 		});
 	});
 
-	// Sync queryInput from URL when URL changes (e.g. back/forward)
-	$effect(() => {
+	// Sync queryInput from URL when navigation occurs (e.g. back/forward)
+	afterNavigate(() => {
 		queryInput = data.parsedQuery.query;
 	});
 
@@ -119,7 +119,7 @@
 		if (currentParams === lastSearchedParams) return;
 
 		// No source selected yet (bare /logs or source loading)
-		if (!parsed.sourceId) return;
+		if (parsed.sourceId === null) return;
 
 		// Source mismatch means loadFieldsForSource is handling it
 		if (parsed.sourceId !== selectedSourceId) return;
@@ -245,7 +245,7 @@
 	}
 
 	async function search(append = false) {
-		if (!selectedSourceId) return;
+		if (selectedSourceId === null) return;
 
 		loading = true;
 		errorMessage = '';

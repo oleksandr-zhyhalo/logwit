@@ -178,6 +178,19 @@ describe('serialize/deserialize roundtrip', () => {
 		expect(restored).toEqual(original);
 	});
 
+	it('roundtrips filter values containing literal %2C text', () => {
+		const original = {
+			sourceId: null,
+			query: '',
+			filters: { tag: ['has%2Cencoded', 'normal'] },
+			timeRange: { type: 'relative' as const, preset: '15m' },
+			timezoneMode: 'local' as const
+		};
+		const params = serialize(original);
+		const restored = deserialize(params);
+		expect(restored.filters).toEqual(original.filters);
+	});
+
 	it('roundtrips filter values with commas', () => {
 		const original = {
 			sourceId: null,
@@ -236,6 +249,18 @@ describe('hasNonDefaultParams', () => {
 				query: '',
 				filters: { level: ['error'] },
 				timeRange: { type: 'relative', preset: '15m' },
+				timezoneMode: 'local'
+			})
+		).toBe(true);
+	});
+
+	it('returns true for non-default relative preset', () => {
+		expect(
+			hasNonDefaultParams({
+				sourceId: 1,
+				query: '',
+				filters: {},
+				timeRange: { type: 'relative', preset: '1h' },
 				timezoneMode: 'local'
 			})
 		).toBe(true);
