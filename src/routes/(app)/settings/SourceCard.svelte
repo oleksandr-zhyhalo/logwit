@@ -58,8 +58,8 @@
 	let fieldsLoaded = $state(false);
 	let fieldsLoading = $state(false);
 	let availableFields = $state<{ name: string; type: string }[]>([]);
-	let activeDisplayFields = $state<{ id: string; name: string }[]>([]);
-	let activeQuickFilterFields = $state<{ id: string; name: string }[]>([]);
+	let activeDisplayFields = $state<string[]>([]);
+	let activeQuickFilterFields = $state<string[]>([]);
 
 	async function loadFields() {
 		if (fieldsLoaded || fieldsLoading) return;
@@ -70,8 +70,8 @@
 				getPreference({ sourceId: source.id })
 			]);
 			availableFields = fields;
-			activeDisplayFields = pref.displayFields.map((name: string) => ({ id: name, name }));
-			activeQuickFilterFields = pref.quickFilterFields.map((name: string) => ({ id: name, name }));
+			activeDisplayFields = pref.displayFields;
+			activeQuickFilterFields = pref.quickFilterFields;
 			fieldsLoaded = true;
 		} catch {
 			availableFields = [];

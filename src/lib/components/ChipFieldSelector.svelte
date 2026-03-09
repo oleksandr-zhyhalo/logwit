@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { dndzone } from 'svelte-dnd-action';
 	import Icon from '@iconify/svelte';
+	import type { IndexField } from '$lib/types';
 
 	let {
 		availableFields,
@@ -8,33 +9,40 @@
 		onchange,
 		loading = false
 	}: {
-		availableFields: { name: string; type: string }[];
-		activeFields: { id: string; name: string }[];
+		availableFields: IndexField[];
+		activeFields: string[];
 		onchange?: (fields: string[]) => void;
 		loading?: boolean;
 	} = $props();
 
+	let dndItems = $state<{ id: string; name: string }[]>([]);
+
+	$effect(() => {
+		dndItems = activeFields.map((name) => ({ id: name, name }));
+	});
+
 	let filteredAvailable = $derived(
-		availableFields.filter((f) => !activeFields.some((a) => a.name === f.name))
+		availableFields.filter((f) => !activeFields.includes(f.name))
 	);
 
-	function handleDndConsider(e: CustomEvent<{ items: typeof activeFields }>) {
-		activeFields = e.detail.items;
+	function handleDndConsider(e: CustomEvent<{ items: typeof dndItems }>) {
+		dndItems = e.detail.items;
 	}
 
-	function handleDndFinalize(e: CustomEvent<{ items: typeof activeFields }>) {
-		activeFields = e.detail.items;
-		onchange?.(activeFields.map((f) => f.name));
+	function handleDndFinalize(e: CustomEvent<{ items: typeof dndItems }>) {
+		dndItems = e.detail.items;
+		activeFields = dndItems.map((f) => f.name);
+		onchange?.(activeFields);
 	}
 
 	function addField(name: string) {
-		activeFields = [...activeFields, { id: name, name }];
-		onchange?.(activeFields.map((f) => f.name));
+		activeFields = [...activeFields, name];
+		onchange?.(activeFields);
 	}
 
 	function removeField(name: string) {
-		activeFields = activeFields.filter((f) => f.name !== name);
-		onchange?.(activeFields.map((f) => f.name));
+		activeFields = activeFields.filter((f) => f !== name);
+		onchange?.(activeFields);
 	}
 </script>
 
@@ -44,14 +52,14 @@
 		<span class="text-xs text-base-content/50">Loading fields...</span>
 	</div>
 {:else}
-	{#if activeFields.length > 0}
+	{#if dndItems.length > 0}
 		<div
-			use:dndzone={{ items: activeFields, flipDurationMs: 150, type: 'chip-fields' }}
+			use:dndzone={{ items: dndItems, flipDurationMs: 150, type: 'chip-fields' }}
 			onconsider={handleDndConsider}
 			onfinalize={handleDndFinalize}
 			class="flex flex-wrap gap-1.5"
 		>
-			{#each activeFields as field (field.id)}
+			{#each dndItems as field (field.id)}
 				<span class="badge gap-1 pr-1 badge-primary">
 					<Icon icon="lucide:grip-vertical" width="10" height="10" class="cursor-grab opacity-60" />
 					{field.name}

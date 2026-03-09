@@ -28,6 +28,8 @@ export const TIME_PRESETS = [
 	{ label: 'Last 1 month', code: '1M', seconds: 30 * 24 * 60 * 60 }
 ] as const;
 
+export type IndexField = { name: string; type: string };
+
 export type UserPreference = {
 	id: number;
 	userId: string;

@@ -2,6 +2,7 @@
 	import Icon from '@iconify/svelte';
 	import { SvelteSet } from 'svelte/reactivity';
 	import { dndzone } from 'svelte-dnd-action';
+	import type { IndexField } from '$lib/types';
 
 	let {
 		fields,
@@ -17,7 +18,7 @@
 		aggregations: Record<string, string[]>;
 		activeFilters: Record<string, string[]>;
 		onfilter?: (filters: Record<string, string[]>) => void;
-		availableFields?: { name: string; type: string }[];
+		availableFields?: IndexField[];
 		onconfigchange?: (fields: string[]) => void;
 		onsearch?: (field: string, searchTerm: string) => Promise<string[]>;
 		pinnedFields?: string[];
@@ -33,6 +34,12 @@
 	let loadingFields = new SvelteSet<string>();
 	let expandedFields = new SvelteSet<string>();
 	let debounceTimers: Record<string, ReturnType<typeof setTimeout>> = {};
+
+	$effect(() => {
+		return () => {
+			for (const timer of Object.values(debounceTimers)) clearTimeout(timer);
+		};
+	});
 
 	const INITIAL_SHOW_COUNT = 10;
 
@@ -156,7 +163,10 @@
 		onfilter?.(updated);
 	}
 
-	let hasAnyFilters = $derived(Object.keys(activeFilters).length > 0);
+	let activeFilterCount = $derived(
+		Object.values(activeFilters).reduce((sum, vals) => sum + vals.length, 0)
+	);
+	let hasAnyFilters = $derived(activeFilterCount > 0);
 
 	function clearAllFilters() {
 		activeFilters = {};
@@ -183,6 +193,11 @@
 				>
 					Filters
 				</h3>
+				{#if collapsed && hasAnyFilters}
+					<span class="rounded-full bg-primary/10 px-1.5 text-[10px] text-primary">
+						{activeFilterCount}
+					</span>
+				{/if}
 			</button>
 			{#if hasAnyFilters}
 				<button

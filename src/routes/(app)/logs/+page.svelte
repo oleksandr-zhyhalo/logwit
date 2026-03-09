@@ -37,7 +37,7 @@
 	let selectedSource = $derived(sources.find((s) => s.id === selectedSourceId));
 
 	let indexFields = $state<{ name: string; type: string; fast: boolean }[]>([]);
-	let activeFields = $state<{ id: string; name: string }[]>([]);
+	let activeFields = $state<string[]>([]);
 	let fieldsLoading = $state(false);
 
 	let excludedFields = $derived(
@@ -59,7 +59,7 @@
 		indexFields.filter((f) => !quickFilterExcludedFields.has(f.name))
 	);
 
-	let extraFieldNames = $derived(activeFields.map((f) => f.name));
+	let extraFieldNames = $derived(activeFields);
 
 	const MAX_COLUMN_CH = 60;
 	let _maxRawWidths: Record<string, number> = {};
@@ -117,7 +117,7 @@
 				getPreference({ sourceId })
 			]);
 			indexFields = fields;
-			activeFields = pref.displayFields.map((name) => ({ id: name, name }));
+			activeFields = pref.displayFields;
 
 			// Load quick filter fields; ensure level is always first
 			const levelField = selectedSource?.levelField ?? 'level';
