@@ -10,6 +10,9 @@ node_modules
 data/
 docs/
 
+# Quickwit
+.quickwit/
+
 # OS
 .DS_Store
 Thumbs.db
