@@ -10,7 +10,8 @@
 		messageField = 'message',
 		extraFields = [],
 		columnWidths = {},
-		timezoneMode = 'local' as 'utc' | 'local'
+		timezoneMode = 'local' as 'utc' | 'local',
+		onclick = () => {}
 	}: {
 		hit: Record<string, unknown>;
 		wrapMode: 'none' | 'wrap' | 'pretty';
@@ -20,6 +21,7 @@
 		extraFields?: string[];
 		columnWidths?: Record<string, number>;
 		timezoneMode?: 'utc' | 'local';
+		onclick?: () => void;
 	} = $props();
 
 	function extractSeverity(doc: Record<string, unknown>): string {
@@ -116,6 +118,15 @@
 	class="cursor-pointer border-b border-l-4 border-base-content/5 pl-3 font-mono text-[13px] leading-[22px] hover:bg-base-content/[0.07] {severityBorderColor(
 		severity
 	)} {wrapMode === 'none' ? 'flex items-stretch' : ''}"
+	role="button"
+	tabindex="0"
+	{onclick}
+	onkeydown={(e) => {
+		if (e.key === 'Enter' || e.key === ' ') {
+			e.preventDefault();
+			onclick();
+		}
+	}}
 >
 	<span class="shrink-0 py-px text-base-content/40">{extractTimestamp(hit)}</span>
 	{#each extraFields as field (field)}

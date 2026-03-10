@@ -40,9 +40,7 @@ describe('serialize', () => {
 	});
 
 	it('includes absolute time range', () => {
-		const params = serialize(
-			defaults({ timeRange: { type: 'absolute', start: 1000, end: 2000 } })
-		);
+		const params = serialize(defaults({ timeRange: { type: 'absolute', start: 1000, end: 2000 } }));
 		expect(params.get('from')).toBe('1000');
 		expect(params.get('to')).toBe('2000');
 	});
@@ -183,16 +181,14 @@ describe('hasNonDefaultParams', () => {
 
 	it('returns true for absolute time', () => {
 		expect(
-			hasNonDefaultParams(
-				defaults({ timeRange: { type: 'absolute', start: 1000, end: 2000 } })
-			)
+			hasNonDefaultParams(defaults({ timeRange: { type: 'absolute', start: 1000, end: 2000 } }))
 		).toBe(true);
 	});
 
 	it('returns true for non-default relative time', () => {
-		expect(
-			hasNonDefaultParams(defaults({ timeRange: { type: 'relative', preset: '1h' } }))
-		).toBe(true);
+		expect(hasNonDefaultParams(defaults({ timeRange: { type: 'relative', preset: '1h' } }))).toBe(
+			true
+		);
 	});
 });
 

@@ -20,6 +20,7 @@
 	import FieldPanel from '$lib/components/FieldPanel.svelte';
 	import QuickFilterPanel from '$lib/components/QuickFilterPanel.svelte';
 	import Icon from '@iconify/svelte';
+	import LogDetailDrawer from '$lib/components/LogDetailDrawer.svelte';
 
 	let { data } = $props();
 
@@ -42,6 +43,8 @@
 	let searchEndTimestamp = $state<number | undefined>(undefined);
 	let wrapMode = $state<'none' | 'wrap' | 'pretty'>('none');
 	let copied = $state(false);
+	let selectedLog = $state<Record<string, unknown> | null>(null);
+	let drawerOpen = $state(false);
 
 	function shareQuery() {
 		navigator.clipboard.writeText(window.location.href);
@@ -327,128 +330,134 @@
 	}
 </script>
 
-<div class="flex h-full w-full">
-	<div
-		class="flex h-full w-56 shrink-0 flex-col overflow-y-auto border-r border-base-300 bg-base-100"
-	>
-		<QuickFilterPanel
-			fields={quickFilterFields}
-			{aggregations}
-			{activeFilters}
-			onfilter={handleFilterChange}
-			availableFields={quickFilterAvailableFields}
-			onconfigchange={handleQuickFilterFieldsChange}
-			onsearch={handleFieldValueSearch}
-			pinnedFields={[fieldConfig.levelField]}
-		/>
-		<FieldPanel
-			availableFields={panelAvailableFields}
-			bind:activeFields
-			onchange={handleFieldsChange}
-			loading={fieldsLoading}
-		/>
-	</div>
+<LogDetailDrawer bind:open={drawerOpen} hit={selectedLog}>
+	<div class="flex h-full w-full">
+		<div
+			class="flex h-full w-56 shrink-0 flex-col overflow-y-auto border-r border-base-300 bg-base-100"
+		>
+			<QuickFilterPanel
+				fields={quickFilterFields}
+				{aggregations}
+				{activeFilters}
+				onfilter={handleFilterChange}
+				availableFields={quickFilterAvailableFields}
+				onconfigchange={handleQuickFilterFieldsChange}
+				onsearch={handleFieldValueSearch}
+				pinnedFields={[fieldConfig.levelField]}
+			/>
+			<FieldPanel
+				availableFields={panelAvailableFields}
+				bind:activeFields
+				onchange={handleFieldsChange}
+				loading={fieldsLoading}
+			/>
+		</div>
 
-	<div class="flex min-w-0 flex-1 flex-col">
-		<div class="border-b border-base-300 bg-base-100 px-4 py-3">
-			<div class="flex w-full items-center gap-2">
-				<select
-					class="select-bordered select w-48 select-sm"
-					value={selectedIndex}
-					onchange={(e) => handleIndexChange(e.currentTarget.value)}
-				>
-					{#each indexes as idx (idx.indexId)}
-						<option value={idx.indexId}>{idx.indexId}</option>
-					{/each}
-				</select>
+		<div class="flex min-w-0 flex-1 flex-col">
+			<div class="border-b border-base-300 bg-base-100 px-4 py-3">
+				<div class="flex w-full items-center gap-2">
+					<select
+						class="select-bordered select w-48 select-sm"
+						value={selectedIndex}
+						onchange={(e) => handleIndexChange(e.currentTarget.value)}
+					>
+						{#each indexes as idx (idx.indexId)}
+							<option value={idx.indexId}>{idx.indexId}</option>
+						{/each}
+					</select>
 
-				<div class="join">
-					{#each [['none', 'No wrap'], ['wrap', 'Wrap'], ['pretty', 'Pretty']] as [mode, label] (mode)}
-						<button
-							class="btn join-item w-18 btn-xs {wrapMode === mode ? 'btn-accent' : ''}"
-							onclick={() => (wrapMode = mode as typeof wrapMode)}
-						>
-							{label}
-						</button>
-					{/each}
+					<div class="join">
+						{#each [['none', 'No wrap'], ['wrap', 'Wrap'], ['pretty', 'Pretty']] as [mode, label] (mode)}
+							<button
+								class="btn join-item w-18 btn-xs {wrapMode === mode ? 'btn-accent' : ''}"
+								onclick={() => (wrapMode = mode as typeof wrapMode)}
+							>
+								{label}
+							</button>
+						{/each}
+					</div>
+
+					<button class="btn ml-auto btn-sm" onclick={shareQuery}>
+						<Icon icon="lucide:share-2" width="14" height="14" />
+						{copied ? 'Copied!' : 'Share'}
+					</button>
+
+					<TimeRangePicker
+						value={timeRange}
+						{timezoneMode}
+						onchange={handleTimeRangeChange}
+						ontimezonechange={(mode) => navigateQuery({ timezoneMode: mode })}
+					/>
+
+					<button
+						class="btn btn-sm btn-accent"
+						onclick={() => navigateQuery({ query: queryInput }, true)}
+						disabled={loading || !selectedIndex}
+					>
+						<Icon icon="lucide:play" width="14" height="14" />
+						{loading && !logs.length ? 'Running...' : 'Run query'}
+					</button>
 				</div>
 
-				<button class="btn btn-sm ml-auto" onclick={shareQuery}>
-					<Icon icon="lucide:share-2" width="14" height="14" />
-					{copied ? 'Copied!' : 'Share'}
-				</button>
-
-				<TimeRangePicker
-					value={timeRange}
-					{timezoneMode}
-					onchange={handleTimeRangeChange}
-					ontimezonechange={(mode) => navigateQuery({ timezoneMode: mode })}
-				/>
-
-				<button
-					class="btn btn-sm btn-accent"
-					onclick={() => navigateQuery({ query: queryInput }, true)}
-					disabled={loading || !selectedIndex}
-				>
-					<Icon icon="lucide:play" width="14" height="14" />
-					{loading && !logs.length ? 'Running...' : 'Run query'}
-				</button>
+				<div class="mt-2 flex w-full items-center gap-2">
+					<input
+						type="text"
+						class="input-bordered input input-sm min-w-0 flex-1"
+						placeholder="Lucene query (e.g. level:error AND service:api)"
+						bind:value={queryInput}
+						onkeydown={handleKeydown}
+					/>
+					{#if hasSearched}
+						<span class="text-xs whitespace-nowrap text-base-content/50"
+							>{numHits.toLocaleString()} hits</span
+						>
+					{/if}
+				</div>
 			</div>
 
-			<div class="mt-2 flex w-full items-center gap-2">
-				<input
-					type="text"
-					class="input-bordered input input-sm min-w-0 flex-1"
-					placeholder="Lucene query (e.g. level:error AND service:api)"
-					bind:value={queryInput}
-					onkeydown={handleKeydown}
-				/>
-				{#if hasSearched}
-					<span class="text-xs whitespace-nowrap text-base-content/50"
-						>{numHits.toLocaleString()} hits</span
-					>
+			<div
+				bind:this={scrollElement}
+				class="min-h-0 flex-1 overflow-auto bg-base-200/30"
+				onscroll={handleScroll}
+			>
+				{#if errorMessage}
+					<div class="p-4">
+						<div class="alert text-sm alert-error">{errorMessage}</div>
+					</div>
+				{:else if !hasSearched}
+					<div class="flex h-full items-center justify-center">
+						<span class="loading loading-sm loading-spinner"></span>
+					</div>
+				{:else if logs.length === 0}
+					<div class="flex h-full items-center justify-center">
+						<p class="text-sm text-base-content/40">No logs found</p>
+					</div>
+				{:else}
+					<div class="w-fit min-w-full">
+						{#each logs as hit, i (i)}
+							<LogRow
+								{hit}
+								{wrapMode}
+								{timezoneMode}
+								levelField={fieldConfig.levelField}
+								timestampField={fieldConfig.timestampField}
+								messageField={fieldConfig.messageField}
+								extraFields={extraFieldNames}
+								{columnWidths}
+								onclick={() => {
+									selectedLog = hit;
+									drawerOpen = true;
+								}}
+							/>
+						{/each}
+						{#if loading}
+							<div class="flex justify-center py-4">
+								<span class="loading loading-sm loading-spinner"></span>
+							</div>
+						{/if}
+					</div>
 				{/if}
 			</div>
 		</div>
-
-		<div
-			bind:this={scrollElement}
-			class="min-h-0 flex-1 overflow-auto bg-base-200/30"
-			onscroll={handleScroll}
-		>
-			{#if errorMessage}
-				<div class="p-4">
-					<div class="alert text-sm alert-error">{errorMessage}</div>
-				</div>
-			{:else if !hasSearched}
-				<div class="flex h-full items-center justify-center">
-					<span class="loading loading-sm loading-spinner"></span>
-				</div>
-			{:else if logs.length === 0}
-				<div class="flex h-full items-center justify-center">
-					<p class="text-sm text-base-content/40">No logs found</p>
-				</div>
-			{:else}
-				<div class="w-fit min-w-full">
-					{#each logs as hit, i (i)}
-						<LogRow
-							{hit}
-							{wrapMode}
-							{timezoneMode}
-							levelField={fieldConfig.levelField}
-							timestampField={fieldConfig.timestampField}
-							messageField={fieldConfig.messageField}
-							extraFields={extraFieldNames}
-							{columnWidths}
-						/>
-					{/each}
-					{#if loading}
-						<div class="flex justify-center py-4">
-							<span class="loading loading-sm loading-spinner"></span>
-						</div>
-					{/if}
-				</div>
-			{/if}
-		</div>
 	</div>
-</div>
+</LogDetailDrawer>

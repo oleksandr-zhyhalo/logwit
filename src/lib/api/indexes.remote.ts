@@ -45,10 +45,7 @@ export const getIndexFields = command(getIndexFieldsSchema, async (data) => {
 export const getIndexConfig = command(indexNameSchema, async (indexName) => {
 	requireUser();
 
-	const [config] = await db
-		.select()
-		.from(indexConfig)
-		.where(eq(indexConfig.indexName, indexName));
+	const [config] = await db.select().from(indexConfig).where(eq(indexConfig.indexName, indexName));
 
 	return {
 		levelField: config?.levelField ?? 'level',

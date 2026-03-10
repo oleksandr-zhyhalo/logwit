@@ -8,8 +8,12 @@ export const indexConfig = sqliteTable('index_config', {
 	levelField: text('level_field').notNull().default('level'),
 	timestampField: text('timestamp_field').notNull().default('timestamp'),
 	messageField: text('message_field').notNull().default('message'),
-	createdAt: integer('created_at', { mode: 'timestamp' }).default(sql`(unixepoch())`).notNull(),
-	updatedAt: integer('updated_at', { mode: 'timestamp' }).default(sql`(unixepoch())`).notNull()
+	createdAt: integer('created_at', { mode: 'timestamp' })
+		.default(sql`(unixepoch())`)
+		.notNull(),
+	updatedAt: integer('updated_at', { mode: 'timestamp' })
+		.default(sql`(unixepoch())`)
+		.notNull()
 });
 
 export const userPreference = sqliteTable(
@@ -22,8 +26,12 @@ export const userPreference = sqliteTable(
 		indexName: text('index_name').notNull(),
 		displayFields: text('display_fields', { mode: 'json' }).$type<string[]>(),
 		quickFilterFields: text('quick_filter_fields', { mode: 'json' }).$type<string[]>(),
-		createdAt: integer('created_at', { mode: 'timestamp' }).default(sql`(unixepoch())`).notNull(),
-		updatedAt: integer('updated_at', { mode: 'timestamp' }).default(sql`(unixepoch())`).notNull()
+		createdAt: integer('created_at', { mode: 'timestamp' })
+			.default(sql`(unixepoch())`)
+			.notNull(),
+		updatedAt: integer('updated_at', { mode: 'timestamp' })
+			.default(sql`(unixepoch())`)
+			.notNull()
 	},
 	(table) => [uniqueIndex('user_preference_unique').on(table.userId, table.indexName)]
 );

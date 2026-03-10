@@ -25,7 +25,7 @@
 		<div class="dropdown dropdown-end">
 			<div tabindex="0" role="button" class="btn btn-circle btn-ghost btn-sm">
 				<div class="avatar avatar-placeholder">
-					<div class="bg-neutral text-neutral-content w-8 rounded-full">
+					<div class="w-8 rounded-full bg-neutral text-neutral-content">
 						<span class="text-xs">{initials}</span>
 					</div>
 				</div>
@@ -48,7 +48,7 @@
 					</li>
 				</ul>
 				<div class="border-t border-base-300 p-2">
-					<button class="btn btn-ghost btn-sm w-full justify-start" onclick={() => signOut()}>
+					<button class="btn w-full justify-start btn-ghost btn-sm" onclick={() => signOut()}>
 						<Icon icon="lucide:log-out" width="16" height="16" class="opacity-70" />
 						Log out
 					</button>

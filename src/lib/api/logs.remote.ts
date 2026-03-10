@@ -9,10 +9,7 @@ import { getQuickwitClient } from '$lib/server/quickwit';
 import { TIME_PRESETS } from '$lib/types';
 
 async function resolveFieldConfig(indexName: string) {
-	const [config] = await db
-		.select()
-		.from(indexConfig)
-		.where(eq(indexConfig.indexName, indexName));
+	const [config] = await db.select().from(indexConfig).where(eq(indexConfig.indexName, indexName));
 
 	return {
 		levelField: config?.levelField ?? 'level',
