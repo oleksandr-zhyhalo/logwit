@@ -378,7 +378,7 @@
 					<div class="join">
 						{#each [['none', 'No wrap'], ['wrap', 'Wrap'], ['pretty', 'Pretty']] as [mode, label] (mode)}
 							<button
-								class="btn join-item w-18 btn-xs {wrapMode === mode ? 'btn-accent' : ''}"
+								class="btn join-item btn-sm whitespace-nowrap {wrapMode === mode ? 'btn-accent' : ''}"
 								onclick={() => (wrapMode = mode as typeof wrapMode)}
 							>
 								{label}
