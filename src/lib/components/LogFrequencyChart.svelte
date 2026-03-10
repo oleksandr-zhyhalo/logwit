@@ -200,8 +200,7 @@
 		const span = timestamps.length > 1 ? timestamps[timestamps.length - 1] - timestamps[0] : 0;
 		const useDate = span > 24 * 60 * 60;
 		// Pad x-range by half a bucket so first/last bars aren't clipped
-		const bucketWidth =
-			timestamps.length > 1 ? timestamps[1] - timestamps[0] : 1;
+		const bucketWidth = timestamps.length > 1 ? timestamps[1] - timestamps[0] : 1;
 		const halfBucket = bucketWidth / 2;
 
 		const opts: uPlotLib.Options = {
@@ -248,7 +247,7 @@
 				},
 				{
 					stroke: '#9ca3af',
-					grid: { show: false },
+					grid: { show: true, stroke: 'rgba(156,163,175,0.15)', width: 0.8 },
 					ticks: { show: false },
 					size: 50
 				}
