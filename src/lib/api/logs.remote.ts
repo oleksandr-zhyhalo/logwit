@@ -2,11 +2,32 @@ import { command } from '$app/server';
 import { db } from '$lib/server/db';
 import { indexConfig } from '$lib/server/db/schema';
 import { eq } from 'drizzle-orm';
-import { searchLogsSchema, searchFieldValuesSchema } from '$lib/schemas/logs';
+import {
+	searchLogsSchema,
+	searchFieldValuesSchema,
+	searchLogHistogramSchema
+} from '$lib/schemas/logs';
+import { computeHistogramInterval, computeHistogramIntervalSeconds } from '$lib/histogram';
 import { AggregationBuilder } from 'quickwit-js';
 import { requireUser } from '$lib/middleware/auth';
 import { getQuickwitClient } from '$lib/server/quickwit';
 import { TIME_PRESETS } from '$lib/types';
+
+function resolveTimestamps(data: {
+	startTimestamp?: number;
+	endTimestamp?: number;
+	timeRange: string;
+}): { startTs: number | undefined; endTs: number | undefined } {
+	if (data.startTimestamp !== undefined && data.endTimestamp !== undefined) {
+		return { startTs: data.startTimestamp, endTs: data.endTimestamp };
+	}
+	const preset = TIME_PRESETS.find((p) => p.code === data.timeRange);
+	if (preset) {
+		const endTs = Math.floor(Date.now() / 1000);
+		return { startTs: endTs - preset.seconds, endTs };
+	}
+	return { startTs: undefined, endTs: undefined };
+}
 
 async function resolveFieldConfig(indexName: string) {
 	const [config] = await db.select().from(indexConfig).where(eq(indexConfig.indexName, indexName));
@@ -25,19 +46,7 @@ export const searchLogs = command(searchLogsSchema, async (data) => {
 	const client = getQuickwitClient();
 	const index = client.index(data.indexName);
 
-	let startTs: number | undefined;
-	let endTs: number | undefined;
-
-	if (data.startTimestamp !== undefined && data.endTimestamp !== undefined) {
-		startTs = data.startTimestamp;
-		endTs = data.endTimestamp;
-	} else {
-		const preset = TIME_PRESETS.find((p) => p.code === data.timeRange);
-		if (preset) {
-			endTs = Math.floor(Date.now() / 1000);
-			startTs = endTs - preset.seconds;
-		}
-	}
+	const { startTs, endTs } = resolveTimestamps(data);
 
 	const query = index
 		.query(data.query || '*')
@@ -85,19 +94,7 @@ export const searchFieldValues = command(searchFieldValuesSchema, async (data) =
 	const baseQuery = data.query?.trim();
 	const combinedQuery = baseQuery && baseQuery !== '*' ? baseQuery : '*';
 
-	let startTs: number | undefined;
-	let endTs: number | undefined;
-
-	if (data.startTimestamp !== undefined && data.endTimestamp !== undefined) {
-		startTs = data.startTimestamp;
-		endTs = data.endTimestamp;
-	} else {
-		const preset = TIME_PRESETS.find((p) => p.code === data.timeRange);
-		if (preset) {
-			endTs = Math.floor(Date.now() / 1000);
-			startTs = endTs - preset.seconds;
-		}
-	}
+	const { startTs, endTs } = resolveTimestamps(data);
 
 	const query = index
 		.query(combinedQuery)
@@ -119,4 +116,80 @@ export const searchFieldValues = command(searchFieldValuesSchema, async (data) =
 	);
 
 	return { values };
+});
+
+export const searchLogHistogram = command(searchLogHistogramSchema, async (data) => {
+	requireUser();
+
+	const fields = await resolveFieldConfig(data.indexName);
+	const client = getQuickwitClient();
+	const index = client.index(data.indexName);
+
+	const { startTs, endTs } = resolveTimestamps(data);
+
+	const windowSeconds =
+		endTs !== undefined && startTs !== undefined ? endTs - startTs : 15 * 60;
+	const interval = computeHistogramInterval(windowSeconds);
+
+	const query = index
+		.query(data.query || '*')
+		.limit(0)
+		.agg(
+			'histogram',
+			AggregationBuilder.dateHistogram(fields.timestampField, interval, {
+				aggs: {
+					levels: AggregationBuilder.terms(fields.levelField, { size: 20 })
+				}
+			})
+		);
+
+	if (startTs !== undefined && endTs !== undefined) {
+		query.timeRange(startTs, endTs);
+	}
+
+	const result = await index.search(query);
+
+	const histAgg = result.aggregations?.histogram as
+		| {
+				buckets?: {
+					key: number;
+					doc_count: number;
+					levels?: { buckets?: { key: string; doc_count: number }[] };
+				}[];
+			}
+		| undefined;
+
+	// Build a map from normalized timestamp → levels
+	const bucketMap = new Map<number, Record<string, number>>();
+	for (const b of histAgg?.buckets ?? []) {
+		const levels: Record<string, number> = {};
+		if (b.levels?.buckets) {
+			for (const lb of b.levels.buckets) {
+				levels[String(lb.key)] = lb.doc_count;
+			}
+		}
+		// Quickwit date_histogram returns keys in milliseconds when the field
+		// uses a datetime format, but in seconds for unix timestamps.
+		// Normalise to seconds: anything above 1e12 (~2001 in ms) is treated as ms.
+		const ts = b.key > 1e12 ? Math.floor(b.key / 1000) : b.key;
+		bucketMap.set(ts, levels);
+	}
+
+	// Pad with empty buckets to cover the full time window
+	const intervalSec = computeHistogramIntervalSeconds(windowSeconds);
+	const buckets: { timestamp: number; levels: Record<string, number> }[] = [];
+
+	if (startTs !== undefined && endTs !== undefined) {
+		const alignedStart = Math.floor(startTs / intervalSec) * intervalSec;
+		for (let ts = alignedStart; ts <= endTs; ts += intervalSec) {
+			buckets.push({ timestamp: ts, levels: bucketMap.get(ts) ?? {} });
+		}
+	} else {
+		// No time bounds — just return what Quickwit gave us
+		for (const [ts, levels] of bucketMap) {
+			buckets.push({ timestamp: ts, levels });
+		}
+	}
+
+	return { buckets };
 });

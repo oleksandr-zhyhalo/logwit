@@ -1,6 +1,6 @@
 <script lang="ts">
 	import { getIndexes, getIndexFields, getIndexConfig } from '$lib/api/indexes.remote';
-	import { searchLogs, searchFieldValues } from '$lib/api/logs.remote';
+	import { searchLogs, searchFieldValues, searchLogHistogram } from '$lib/api/logs.remote';
 	import {
 		getPreference,
 		saveDisplayFields,
@@ -21,6 +21,7 @@
 	import QuickFilterPanel from '$lib/components/QuickFilterPanel.svelte';
 	import Icon from '@iconify/svelte';
 	import LogDetailDrawer from '$lib/components/LogDetailDrawer.svelte';
+	import LogFrequencyChart from '$lib/components/LogFrequencyChart.svelte';
 
 	let { data } = $props();
 
@@ -45,6 +46,11 @@
 	let copied = $state(false);
 	let selectedLog = $state<Record<string, unknown> | null>(null);
 	let drawerOpen = $state(false);
+	let histogramData = $state<{ timestamp: number; levels: Record<string, number> }[]>([]);
+	let histogramLoading = $state(false);
+	let chartCollapsed = $state(
+		browser ? localStorage.getItem('logwit:chartCollapsed') === 'true' : false
+	);
 
 	function shareQuery() {
 		navigator.clipboard.writeText(window.location.href);
@@ -247,6 +253,11 @@
 
 		try {
 			const resolved = resolveTimeRange(timeRange);
+
+			if (!append) {
+				fetchHistogram(resolved.startTs, resolved.endTs);
+			}
+
 			const result = await searchLogs({
 				indexName: selectedIndex,
 				query: queryText || '*',
@@ -291,6 +302,44 @@
 		} finally {
 			loading = false;
 		}
+	}
+
+	let histogramRequestId = 0;
+
+	async function fetchHistogram(startTs?: number, endTs?: number) {
+		if (selectedIndex === null) return;
+
+		const requestId = ++histogramRequestId;
+		histogramLoading = true;
+		try {
+			const result = await searchLogHistogram({
+				indexName: selectedIndex,
+				query: queryText || '*',
+				timeRange: (timeRange.type === 'relative' ? timeRange.preset : '15m') as '15m',
+				startTimestamp: startTs,
+				endTimestamp: endTs
+			});
+			if (requestId !== histogramRequestId) return;
+			histogramData = result.buckets;
+		} catch {
+			if (requestId !== histogramRequestId) return;
+			histogramData = [];
+		} finally {
+			if (requestId === histogramRequestId) {
+				histogramLoading = false;
+			}
+		}
+	}
+
+	function handleChartToggle() {
+		chartCollapsed = !chartCollapsed;
+		if (browser) {
+			localStorage.setItem('logwit:chartCollapsed', String(chartCollapsed));
+		}
+	}
+
+	function handleBrush(start: number, end: number) {
+		navigateQuery({ timeRange: { type: 'absolute', start, end } });
 	}
 
 	function handleKeydown(event: KeyboardEvent) {
@@ -423,6 +472,17 @@
 					{/if}
 				</div>
 			</div>
+
+			{#if hasSearched}
+				<LogFrequencyChart
+					data={histogramData}
+					{timezoneMode}
+					loading={histogramLoading}
+					collapsed={chartCollapsed}
+					ontoggle={handleChartToggle}
+					onbrush={handleBrush}
+				/>
+			{/if}
 
 			<div
 				bind:this={scrollElement}
