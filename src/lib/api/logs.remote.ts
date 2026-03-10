@@ -7,7 +7,7 @@ import {
 	searchFieldValuesSchema,
 	searchLogHistogramSchema
 } from '$lib/schemas/logs';
-import { computeHistogramInterval, computeHistogramIntervalSeconds } from '$lib/histogram';
+import { computeHistogramInterval, computeHistogramIntervalSeconds, padHistogramBuckets } from '$lib/histogram';
 import { AggregationBuilder } from 'quickwit-js';
 import { requireUser } from '$lib/middleware/auth';
 import { getQuickwitClient } from '$lib/server/quickwit';
@@ -177,18 +177,13 @@ export const searchLogHistogram = command(searchLogHistogramSchema, async (data)
 
 	// Pad with empty buckets to cover the full time window
 	const intervalSec = computeHistogramIntervalSeconds(windowSeconds);
-	const buckets: { timestamp: number; levels: Record<string, number> }[] = [];
+	let buckets: { timestamp: number; levels: Record<string, number> }[];
 
 	if (startTs !== undefined && endTs !== undefined) {
-		const alignedStart = Math.floor(startTs / intervalSec) * intervalSec;
-		for (let ts = alignedStart; ts <= endTs; ts += intervalSec) {
-			buckets.push({ timestamp: ts, levels: bucketMap.get(ts) ?? {} });
-		}
+		buckets = padHistogramBuckets(bucketMap, startTs, endTs, intervalSec);
 	} else {
 		// No time bounds — just return what Quickwit gave us
-		for (const [ts, levels] of bucketMap) {
-			buckets.push({ timestamp: ts, levels });
-		}
+		buckets = [...bucketMap].map(([ts, levels]) => ({ timestamp: ts, levels }));
 	}
 
 	return { buckets };
